@@ -35,6 +35,8 @@ setup(
     keywords=['profiler', 'make', 'gnu-make'],
     url='https://github.com/gojuno/make-profiler',
     packages=['make_profiler'],
+    package_dir={'make_profiler': 'make_profiler'},
+    package_data={'make_profiler': ['make_profiler/*']},
     test_suite='test',
     zip_safe=False,
     install_requires=(
