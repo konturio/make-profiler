@@ -1,4 +1,4 @@
 include README.md
 include MANIFEST.in
 
-recursive-include make_profiler *
+recursive-include make_profiler/report/script.js
