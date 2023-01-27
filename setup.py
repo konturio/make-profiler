@@ -35,8 +35,7 @@ setup(
     keywords=['profiler', 'make', 'gnu-make'],
     url='https://github.com/gojuno/make-profiler',
     packages=['make_profiler'],
-    package_dir={'make_profiler': 'make_profiler'},
-    package_data={'make_profiler': ['make_profiler/*']},
+    data_files=[('make_profiler/report', ['make_profiler/report/style.css'])],
     test_suite='test',
     zip_safe=False,
     install_requires=(
@@ -57,5 +56,4 @@ setup(
         'Programming Language :: Python',
         'License :: OSI Approved :: BSD License',
     ],
-    include_package_data=True,
 )
