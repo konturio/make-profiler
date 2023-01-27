@@ -1,4 +1,4 @@
 include README.md
 include MANIFEST.in
 recursive-include make_profiler *.py
-recursive-include make_profiler/report *.*
+graft make_profiler/report
