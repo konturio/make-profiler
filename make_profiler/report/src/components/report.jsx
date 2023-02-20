@@ -58,7 +58,6 @@ class ReportComponent extends React.Component {
             const sorted = [...this.state.filteredStatus].sort((a, b) => {
                 if (a[sortField] === null) return 1;
                 if (b[sortField] === null) return -1;
-                if (a[sortField] === null && b[sortField] === null) return 0;
                 if (a[sortField] === undefined || b[sortField] === undefined) return 0;
 
                 return (
@@ -213,7 +212,6 @@ class ReportComponent extends React.Component {
                         window.open("make.svg", "_blank");
                     }} >Status Chart</Button>
                     <Textarea className="searchInput" onChange={this.onFilter} message="Search for target name.." ><Search16 /></Textarea>
-                    {/* <input id="myInput" type="text" onChange={this.onFilter} placeholder="Search for target name.." title="Type in a name" /> */}
                     {this.status(filteredStatus)}
                 </div>
             );
