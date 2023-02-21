@@ -139,7 +139,8 @@ class ReportComponent extends React.Component {
                 {this.thead()}
                 <tbody>
                     {_status.map(item => (
-                        <tr key={item.targetName} className={item.targetType}>
+                        <tr key={item.targetName} className={item.targetType.replace(" ", "")}>
+                            {/* used replace not to see "never started" as yellow */}
                             <td>{item.targetName}<p id='description'>{item.targetDescription}</p></td>
                             <td>{item.lastTargetCompletionTime ? this.formatDate(item.lastTargetCompletionTime) : '-'}</td>
                             <td>{item.targetType}</td>

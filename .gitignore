@@ -5,3 +5,5 @@ dist
 *.db
 config.inc.sh
 make_profile.db
+/make_profiler/report/node_modules
+/make_profiler/report/public/report.json

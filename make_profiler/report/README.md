@@ -12,8 +12,11 @@ index.html consumes and reports last status.
 Any process can be searched on UI.  
 Failed & idle tasks are reported with red & yellow colors.  
 All fields can be sorted.  
-
-
+  
+run "npm install" to add dependencies  
+run if there is babel error "sudo npm cache clean --force"  
+add report.jsn under public folder for test  
+  
 # Getting Started with Create React App
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
