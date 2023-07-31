@@ -107,13 +107,15 @@ def parse(fd: TextIO, is_check_loop: bool = True, loop_check_depth: int = 20) ->
 
         # create temporary file
         tmp = tempfile.NamedTemporaryFile(mode = 'w+t')
+        tmp_name=tmp.name
+        tmp.close() #on windows it is not possible to open file for writing twice. So file needs to be closed.
 
         # open temporary file and write composed make to them
-        with open(tmp.name, 'w') as temp_input_file:
+        with open(tmp_name, 'w') as temp_input_file:
             temp_input_file.write(make_full_text)
 
         # open temporary file as <class '_io.TextIOWrapper'> to support type compatibiluty with tokenizer() 
-        temp_make_file = open(tmp.name, 'r')
+        temp_make_file = open(tmp_name, 'r')
         
         return temp_make_file
 
