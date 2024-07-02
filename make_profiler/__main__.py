@@ -64,6 +64,8 @@ def main(argv=sys.argv[1:]):
         type=int,
         default=20,
         help='Depth of the nesting includes')
+    
+    print(datetime.now(), 68)
 
     parser.add_argument('target', nargs='?')
 
@@ -75,28 +77,35 @@ def main(argv=sys.argv[1:]):
     else:
         out_file = tempfile.NamedTemporaryFile(mode='w+')
 
+    print(datetime.now(), 80)
     ast = parse(in_file, args.disable_loop_detection, args.include_depth)
     generate_makefile(ast, out_file, args.db_filename)
     out_file.flush()
 
+    print(datetime.now(), 85)
     if args.preprocess_only:
         print(out_file.getvalue())
         return
 
+    print(datetime.now(), 90)
     if args.target is not None:
         cmd = ['make'] + unknown_args + ['-f', out_file.name, args.target]
         logger.info(' '.join(cmd))
         subprocess.call(cmd)
 
+    print(datetime.now(), 96)
     docs = dict([
         (i[1]['target'], i[1]['docs'])
         for i in ast if i[0] == 'target'
     ])
+    print(datetime.now(), 101)
     performance = parse_timing_db(args.db_filename, args.after_date)
+    print(datetime.now(), 103)
     deps, influences, order_only, indirect_influences = get_dependencies_influences(ast)
 
     dot_file = io.StringIO()
 
+    print(datetime.now(), 108)
     export_dot(
         dot_file,
         influences,
@@ -108,11 +117,13 @@ def main(argv=sys.argv[1:]):
     )
     dot_file.seek(0)
 
+    print(datetime.now(), 120)
     render_dot(
         dot_file,
         args.svg_filename
     )
 
+    print(datetime.now(), 126)
     export_report(
         performance,
         docs,
