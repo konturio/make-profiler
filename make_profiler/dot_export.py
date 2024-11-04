@@ -202,12 +202,26 @@ digraph G {
     f.write('}')
 
 
+# def render_dot(dot_fd, image_filename):
+#     unflatten = Popen('unflatten', stdin=PIPE, stdout=PIPE)
+#     dot = Popen(['dot', '-Tsvg'], stdin=unflatten.stdout, stdout=PIPE)
+#     unflatten.stdin.write(dot_fd.read().encode('utf-8'))
+#     unflatten.stdin.close()
+#     unflatten.stdout.close()  # Allow p1 to receive a SIGPIPE if p2 exits.
+#     svg, _ = dot.communicate()
+#     svg = svg.replace(b'svg width', b'svg disabled-width').replace(b'height', b'disabled-height')
+#     open(image_filename, 'wb').write(svg)
+
 def render_dot(dot_fd, image_filename):
-    unflatten = Popen('unflatten', stdin=PIPE, stdout=PIPE)
-    dot = Popen(['dot', '-Tsvg'], stdin=unflatten.stdout, stdout=PIPE)
-    unflatten.stdin.write(dot_fd.read().encode('utf-8'))
-    unflatten.stdin.close()
-    unflatten.stdout.close()  # Allow p1 to receive a SIGPIPE if p2 exits.
-    svg, _ = dot.communicate()
+    dot_command = 'sfdp -Tsvg -Goverlap=scale -Goutputorder=edgesfirst'  # Используем sfdp и параметры для упрощения плотных схем
+
+    process = Popen(dot_command, stdin=PIPE, stdout=PIPE, shell=True)
+    process.stdin.write(dot_fd.read().encode('utf-8'))
+    process.stdin.close()
+
+    svg, _ = process.communicate()
     svg = svg.replace(b'svg width', b'svg disabled-width').replace(b'height', b'disabled-height')
-    open(image_filename, 'wb').write(svg)
+
+    with open(image_filename, 'wb') as svg_file:
+        svg_file.write(svg)
+
