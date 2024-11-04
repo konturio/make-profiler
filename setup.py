@@ -38,7 +38,7 @@ setup(
     test_suite='test',
     zip_safe=False,
     install_requires=(
-        'more-itertools==2.4.1',
+        'more-itertools>=2.4.1',
     ),
     entry_points={
         'console_scripts': [
