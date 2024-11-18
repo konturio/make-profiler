@@ -202,24 +202,44 @@ digraph G {
     f.write('}')
 
 
-def render_dot(dot_fd, image_filename):
-    unflatten = Popen('unflatten', stdin=PIPE, stdout=PIPE)
-    dot = Popen(['dot', '-Tsvg'], stdin=unflatten.stdout, stdout=PIPE)
-    unflatten.stdin.write(dot_fd.read().encode('utf-8'))
-    unflatten.stdin.close()
-    unflatten.stdout.close()  # Allow p1 to receive a SIGPIPE if p2 exits.
-    svg, _ = dot.communicate()
-    svg = svg.replace(b'svg width', b'svg disabled-width').replace(b'height', b'disabled-height')
-    open(image_filename, 'wb').write(svg)
-
 # def render_dot(dot_fd, image_filename):
-#     dot_command = 'sfdp -Tsvg -Goverlap=scale -Goutputorder=edgesfirst'
-
-#     process = Popen(dot_command, stdin=PIPE, stdout=PIPE, shell=True)
-#     svg, _ = process.communicate(input=dot_fd.read().encode('utf-8'))
-    
+#     unflatten = Popen('unflatten', stdin=PIPE, stdout=PIPE)
+#     dot = Popen(['dot', '-Tsvg'], stdin=unflatten.stdout, stdout=PIPE)
+#     unflatten.stdin.write(dot_fd.read().encode('utf-8'))
+#     unflatten.stdin.close()
+#     unflatten.stdout.close()  # Allow p1 to receive a SIGPIPE if p2 exits.
+#     svg, _ = dot.communicate()
 #     svg = svg.replace(b'svg width', b'svg disabled-width').replace(b'height', b'disabled-height')
+#     open(image_filename, 'wb').write(svg)
 
-#     with open(image_filename, 'wb') as svg_file:
-#         svg_file.write(svg)
+def render_dot(dot_fd, image_filename):
+    # Read the DOT graph content from dot_fd
+    dot_content = dot_fd.read().encode('utf-8')
+
+    # Write the DOT graph content to a file named "graph"
+    with open("graph", "wb") as graph_file:
+        graph_file.write(dot_content)
+
+    # Start the unflatten process
+    unflatten = Popen('unflatten', stdin=PIPE, stdout=PIPE)
+
+    # Start the dot process, connecting unflatten's output to dot's input
+    dot = Popen(['dot', '-Tsvg'], stdin=unflatten.stdout, stdout=PIPE)
+
+    # Send the DOT graph content to unflatten
+    unflatten.stdin.write(dot_content)
+    unflatten.stdin.close()
+
+    # Close the stdout pipe of unflatten
+    unflatten.stdout.close()
+
+    # Wait for dot to finish and capture its output
+    svg, _ = dot.communicate()
+
+    # Modify the SVG content
+    svg = svg.replace(b'svg width', b'svg disabled-width').replace(b'height', b'disabled-height')
+
+    # Save the SVG to the specified file
+    with open(image_filename, 'wb') as svg_file:
+        svg_file.write(svg)
 
