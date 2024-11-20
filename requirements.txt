@@ -1,2 +1,2 @@
 more_itertools
-graph-tool==2.43
+graph-tool>=2.30,<3.0

@@ -39,7 +39,7 @@ setup(
     zip_safe=False,
     install_requires=(
         'more-itertools>=2.4.1',
-        'graph-tool==2.43',
+        'graph-tool>=2.30,<3.0',
     ),
     entry_points={
         'console_scripts': [
