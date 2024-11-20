@@ -8,6 +8,7 @@ from subprocess import Popen, PIPE
 
 import tempfile
 from graph_tool.all import Graph, graph_draw
+from graph_tool.all import load_graph
 
 def critical_path(influences, dependencies, inputs, timing):
     targets = dict()
@@ -247,10 +248,13 @@ digraph G {
 #         svg_file.write(svg)
 
 
-def render_dot(graph, image_filename):
+def render_dot(dot_fd, image_filename):
     # Create a temporary file for the initial SVG output
     with tempfile.NamedTemporaryFile(delete=False, suffix=".svg") as tmp_svg:
         temp_svg_path = tmp_svg.name
+
+    # Convert the input DOT format into a graph_tool.Graph object
+    graph = load_graph(dot_fd, fmt="dot")
 
     # Draw the graph and save to the temporary file
     graph_draw(
