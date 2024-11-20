@@ -1,2 +1,2 @@
 more_itertools
-python3-graph-tool
+graph-tool==2.43
