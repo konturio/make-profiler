@@ -1,2 +1,2 @@
 more_itertools
-graphtools
+python3-graph-tool

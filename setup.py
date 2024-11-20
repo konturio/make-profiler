@@ -39,7 +39,7 @@ setup(
     zip_safe=False,
     install_requires=(
         'more-itertools>=2.4.1',
-        'graphtools',
+        'python3-graph-tool',
     ),
     entry_points={
         'console_scripts': [
