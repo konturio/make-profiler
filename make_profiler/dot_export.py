@@ -216,66 +216,66 @@ digraph G {
 #     svg = svg.replace(b'svg width', b'svg disabled-width').replace(b'height', b'disabled-height')
 #     open(image_filename, 'wb').write(svg)
 
-# def render_dot(dot_fd, image_filename):
-#     # Read the DOT graph content from dot_fd
-#     dot_content = dot_fd.read().encode('utf-8')
-
-#     # Write the DOT graph content to a file named "graph"
-#     with open("graph", "wb") as graph_file:
-#         graph_file.write(dot_content)
-
-#     # Start the unflatten process
-#     unflatten = Popen('unflatten', stdin=PIPE, stdout=PIPE)
-
-#     # Start the dot process, connecting unflatten's output to dot's input
-#     dot = Popen(['dot', '-Tsvg'], stdin=unflatten.stdout, stdout=PIPE)
-
-#     # Send the DOT graph content to unflatten
-#     unflatten.stdin.write(dot_content)
-#     unflatten.stdin.close()
-
-#     # Close the stdout pipe of unflatten
-#     unflatten.stdout.close()
-
-#     # Wait for dot to finish and capture its output
-#     svg, _ = dot.communicate()
-
-#     # Modify the SVG content
-#     svg = svg.replace(b'svg width', b'svg disabled-width').replace(b'height', b'disabled-height')
-
-#     # Save the SVG to the specified file
-#     with open(image_filename, 'wb') as svg_file:
-#         svg_file.write(svg)
-
-
 def render_dot(dot_fd, image_filename):
-    # Create a temporary file for the initial SVG output
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".svg") as tmp_svg:
-        temp_svg_path = tmp_svg.name
+    # Read the DOT graph content from dot_fd
+    dot_content = dot_fd.read().encode('utf-8')
 
-    # Convert the input DOT format into a graph_tool.Graph object
-    graph = load_graph(dot_fd, fmt="dot")
+    # Write the DOT graph content to a file named "graph"
+    with open("graph", "wb") as graph_file:
+        graph_file.write(dot_content)
 
-    # Draw the graph and save to the temporary file
-    graph_draw(
-        graph,
-        output=temp_svg_path,
-        vertex_text=graph.vertex_index,
-        edge_pen_width=0.5,
-    )
+    # Start the unflatten process
+    unflatten = Popen('unflatten', stdin=PIPE, stdout=PIPE)
 
-    # Read and modify the SVG content
-    with open(temp_svg_path, "rb") as svg_file:
-        svg_content = svg_file.read()
-        modified_svg = svg_content.replace(
-            b'svg width', b'svg disabled-width'
-        ).replace(
-            b'height', b'disabled-height'
-        )
+    # Start the dot process, connecting unflatten's output to dot's input
+    dot = Popen(['dot', '-Tsvg'], stdin=unflatten.stdout, stdout=PIPE)
 
-    # Write the modified SVG to the final output file
-    with open(image_filename, "wb") as output_file:
-        output_file.write(modified_svg)
+    # Send the DOT graph content to unflatten
+    unflatten.stdin.write(dot_content)
+    unflatten.stdin.close()
 
-    # Optional: Clean up the temporary file (uncomment if needed)
-    os.remove(temp_svg_path)
+    # Close the stdout pipe of unflatten
+    unflatten.stdout.close()
+
+    # Wait for dot to finish and capture its output
+    svg, _ = dot.communicate()
+
+    # Modify the SVG content
+    svg = svg.replace(b'svg width', b'svg disabled-width').replace(b'height', b'disabled-height')
+
+    # Save the SVG to the specified file
+    with open(image_filename, 'wb') as svg_file:
+        svg_file.write(svg)
+
+
+# def render_dot(dot_fd, image_filename):
+#     # Create a temporary file for the initial SVG output
+#     with tempfile.NamedTemporaryFile(delete=False, suffix=".svg") as tmp_svg:
+#         temp_svg_path = tmp_svg.name
+
+#     # Convert the input DOT format into a graph_tool.Graph object
+#     graph = load_graph(dot_fd, fmt="dot")
+
+#     # Draw the graph and save to the temporary file
+#     graph_draw(
+#         graph,
+#         output=temp_svg_path,
+#         vertex_text=graph.vertex_index,
+#         edge_pen_width=0.5,
+#     )
+
+#     # Read and modify the SVG content
+#     with open(temp_svg_path, "rb") as svg_file:
+#         svg_content = svg_file.read()
+#         modified_svg = svg_content.replace(
+#             b'svg width', b'svg disabled-width'
+#         ).replace(
+#             b'height', b'disabled-height'
+#         )
+
+#     # Write the modified SVG to the final output file
+#     with open(image_filename, "wb") as output_file:
+#         output_file.write(modified_svg)
+
+#     # Optional: Clean up the temporary file (uncomment if needed)
+#     os.remove(temp_svg_path)
