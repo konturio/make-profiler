@@ -7,8 +7,8 @@ import math
 from subprocess import Popen, PIPE
 
 import tempfile
-from graph_tool.all import Graph, graph_draw
-from graph_tool.all import load_graph
+# from graph_tool.all import Graph, graph_draw
+# from graph_tool.all import load_graph
 
 def critical_path(influences, dependencies, inputs, timing):
     targets = dict()
