@@ -204,7 +204,7 @@ digraph G {
 
 def render_dot(dot_fd, image_filename):
     unflatten = Popen('unflatten', stdin=PIPE, stdout=PIPE)
-    dot = Popen(['dot', '-Tsvg'], stdin=unflatten.stdout, stdout=PIPE)
+    dot = Popen(['dot', '-Tsvg', '-Gnslimit=50'], stdin=unflatten.stdout, stdout=PIPE)
     unflatten.stdin.write(dot_fd.read().encode('utf-8'))
     unflatten.stdin.close()
     unflatten.stdout.close()  # Allow p1 to receive a SIGPIPE if p2 exits.
