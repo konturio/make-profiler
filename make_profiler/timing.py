@@ -62,3 +62,81 @@ def parse_timing_db(filename, after_date=None):
             else:
                 targets[target]['timing_sec'] = targets[target]['finish_prev'] - targets[target]['start_prev']
     return targets
+
+
+def analyze_target(filename, target_name):
+    """Return timing statistics for the given target.
+
+    Parameters
+    ----------
+    filename: str
+        Path to ``make_profile.db`` file.
+    target_name: str
+        Name of the target to analyse.
+
+    Returns
+    -------
+    dict
+        Dictionary containing ``started`` and ``finished`` counts along with
+        ``max``, ``min``, ``avg``, ``median`` and ``last`` duration in seconds.
+    """
+
+    if not os.path.isfile(filename):
+        return {
+            'started': 0,
+            'finished': 0,
+            'max': 0,
+            'min': 0,
+            'avg': 0,
+            'median': 0,
+            'last': 0,
+        }
+
+    lines = [i.strip().split() for i in open(filename)]
+    runs = {}
+
+    for ts_str, bid, action, tgt in lines:
+        if tgt != target_name or action not in ('start', 'finish'):
+            continue
+        ts = float(ts_str)
+        runs.setdefault(bid, {}).update({action: ts})
+
+    started = 0
+    finished = 0
+    durations = []
+
+    for bid, data in runs.items():
+        if 'start' in data:
+            started += 1
+        if 'start' in data and 'finish' in data:
+            failpath = os.path.join('logs', bid, target_name, 'failed.touch')
+            if not os.path.exists(failpath):
+                finished += 1
+                durations.append((data['finish'], data['finish'] - data['start']))
+
+    durations.sort(key=lambda d: d[0])
+    times = [d[1] for d in durations]
+
+    if times:
+        max_d = max(times)
+        min_d = min(times)
+        avg_d = sum(times) / len(times)
+        n = len(times)
+        if n % 2:
+            median_d = sorted(times)[n // 2]
+        else:
+            sorted_t = sorted(times)
+            median_d = (sorted_t[n // 2 - 1] + sorted_t[n // 2]) / 2
+        last_d = times[-1]
+    else:
+        max_d = min_d = avg_d = median_d = last_d = 0
+
+    return {
+        'started': started,
+        'finished': finished,
+        'max': max_d,
+        'min': min_d,
+        'avg': avg_d,
+        'median': median_d,
+        'last': last_d,
+    }

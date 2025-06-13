@@ -9,7 +9,7 @@ from datetime import datetime
 from make_profiler.dot_export import export_dot, render_dot
 from make_profiler.parser import parse, get_dependencies_influences
 from make_profiler.preprocess import generate_makefile
-from make_profiler.timing import parse_timing_db
+from make_profiler.timing import parse_timing_db, analyze_target
 from make_profiler.report_export import export_report
 
 logging.basicConfig(level=logging.INFO)
@@ -53,6 +53,11 @@ def main(argv=sys.argv[1:]):
         default=None,
         help='Render report image with full target time only after the specified date in iso format (other targets will have a time of 1s)')
     parser.add_argument(
+        '--analyze',
+        dest='analyze',
+        metavar='TARGET',
+        help='Analyze timing statistics for given target')
+    parser.add_argument(
         '--disable_loop_detection',
         dest='disable_loop_detection',
         action='store_false',
@@ -68,6 +73,18 @@ def main(argv=sys.argv[1:]):
     parser.add_argument('target', nargs='?')
 
     args, unknown_args = parser.parse_known_args(argv)
+
+    if args.analyze:
+        stats = analyze_target(args.db_filename, args.analyze)
+        print('started:', stats['started'])
+        print('finished:', stats['finished'])
+        if stats['finished']:
+            print('max:', stats['max'])
+            print('min:', stats['min'])
+            print('avg:', stats['avg'])
+            print('median:', stats['median'])
+            print('last:', stats['last'])
+        return
 
     in_file = open(args.in_filename, 'r')
     if args.preprocess_only:
