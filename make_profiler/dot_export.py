@@ -5,6 +5,7 @@ import datetime
 import os
 import math
 from subprocess import Popen, PIPE
+from graphviz import Digraph
 
 def critical_path(influences, dependencies, inputs, timing):
     targets = dict()
@@ -86,8 +87,14 @@ def classify_target(name, influences, dependencies, inputs, order_only):
     return group
 
 
-def dot_node(name, performance, docstring, cp):
-    node = {'label': name, 'fontsize': 10, 'color': 'black', 'fillcolor': '#d3d3d3'}
+def dot_node(graph, name, performance, docstring, cp):
+    """Add a node to *graph* with attributes derived from performance data."""
+    node = {
+        'label': name,
+        'fontsize': '10',
+        'color': 'black',
+        'fillcolor': '#d3d3d3'
+    }
     if name in performance:
         target_performance = performance[name]
         if target_performance['done']:
@@ -114,18 +121,14 @@ def dot_node(name, performance, docstring, cp):
         node['image'] = name
         node['imagescale'] = 'true'
         node['width'] = '1'
-    node = ','.join(['%s="%s"' % (k, v) for k, v in node.items()])
-    return '"%s" [%s]' % (name, node)
+    graph.node(name, **node)
 
 
 def export_dot(f, influences, dependencies, order_only, performance, indirect_influences, docs):
-    f.write("""
-digraph G {
-    rankdir="BT"
-    ratio=0.5625
-    node [shape="box"]
-    newrank=true
-""")
+    dot = Digraph('G')
+    dot.attr(rankdir='BT', ratio='0.5625', newrank='true')
+    dot.attr('node', shape='box')
+
     groups = collections.defaultdict(set)
 
     # look for keys that aren't linked
@@ -152,54 +155,56 @@ digraph G {
         groups[group].add(target)
 
     for k, v in sorted(groups.items()):
-        label = ''
-        if k in labels:
-            label = 'label="%s"' % labels[k]
-
-        nodes = [dot_node(t, performance, docs.get(t, t), cp) for t in v]
-        nodes.append('\"%s_DUMMY\" [shape=point style=invis]' % k)
-        if k == 'cluster_result':
-            nodes.append('rank=sink;')
-        #if k == 'cluster_inputs':
-            #nodes.append('rank=source;')
-        if k == 'cluster_tools':
-            nodes.append('rank=source;')
         if k == 'cluster_order_only':
             hidden_nodes = v
             continue
-
-            nodes.append('style=invis;')
-
-
-        f.write('subgraph "%s" { %s graph[style=dotted] %s }\n' % (k, label, ';\n'.join(nodes)))
+        label = labels.get(k, '')
+        with dot.subgraph(name=k) as sg:
+            if label:
+                sg.attr(label=label)
+            sg.attr(style='dotted')
+            if k == 'cluster_result':
+                sg.attr(rank='sink')
+            if k == 'cluster_tools':
+                sg.attr(rank='source')
+            for t in v:
+                dot_node(sg, t, performance, docs.get(t, t), cp)
+            sg.node(f"{k}_DUMMY", shape='point', style='invis')
 
     for k, v in influences.items():
         for t in sorted(v):
             if t in indirect_influences[k]:
-                f.write('"%s" -> "%s" [color="#00000033",weight="0",style="dashed"];\n' % (k, t))
+                dot.edge(k, t, color="#00000033", weight="0", style="dashed")
             elif k in cp and t in cp:
-                f.write('"%s" -> "%s" [color="#cc0000",weight="10",penwidth="3",headclip="true"];\n' % (k, t))
+                dot.edge(k, t, color="#cc0000", weight="10", penwidth="3", headclip="true")
             else:
-                f.write('"%s" -> "%s";\n' % (k, t))
+                dot.edge(k, t)
 
-    f.write('cluster_inputs_DUMMY -> cluster_tools_DUMMY -> cluster_result_DUMMY [ style=invis ];')
+    dot.edge('cluster_inputs_DUMMY', 'cluster_tools_DUMMY', style='invis')
+    dot.edge('cluster_tools_DUMMY', 'cluster_result_DUMMY', style='invis')
 
     if 'cluster_not_implemented' in groups:
-        f.write('cluster_inputs_DUMMY -> cluster_not_implemented_DUMMY -> cluster_tools_DUMMY [ style=invis ];')
-        f.write('cluster_not_implemented_DUMMY -> cluster_order_only_DUMMY [ style=invis ];')
+        dot.edge('cluster_inputs_DUMMY', 'cluster_not_implemented_DUMMY', style='invis')
+        dot.edge('cluster_not_implemented_DUMMY', 'cluster_tools_DUMMY', style='invis')
+        dot.edge('cluster_not_implemented_DUMMY', 'cluster_order_only_DUMMY', style='invis')
 
     def format_deciminutes(k):
         hrs = math.floor(k / 6)
         min = (k %6)*10
         return '%s:%02d'%(hrs,min)
 
-    for k,v in timing_tags.items():
-        f.write('{ rank=same; ' + '%s [label="%s"]'%(k,format_deciminutes(k)) + ' [fontsize=50];' + ';'.join(['"%s"' % t for t in v if t not in hidden_nodes]) + '}')
+    for k, v in timing_tags.items():
+        with dot.subgraph() as sg:
+            sg.attr(rank='same')
+            sg.node(str(k), label=format_deciminutes(k), fontsize='50')
+            for t in v:
+                if t not in hidden_nodes:
+                    sg.node(t)
     tags = sorted(timing_tags.keys())
+    for a, b in zip(tags, tags[1:]):
+        dot.edge(str(a), str(b))
 
-    f.write('->'.join([ '%s' % k  for k in tags]))
-
-    f.write('}')
+    f.write(dot.source)
 
 
 def render_dot(dot_fd, image_filename):
