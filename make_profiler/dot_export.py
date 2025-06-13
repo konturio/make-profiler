@@ -114,8 +114,11 @@ def dot_node(name, performance, docstring, cp):
         node['image'] = name
         node['imagescale'] = 'true'
         node['width'] = '1'
-    node = ','.join(['%s="%s"' % (k, v) for k, v in node.items()])
-    return '"%s" [%s]' % (name, node)
+    def escape(val: str) -> str:
+        return str(val).replace("\\", "\\\\").replace('"', '\\"')
+
+    node = ','.join([f'{k}="{escape(v)}"' for k, v in node.items()])
+    return '"%s" [%s]' % (escape(name), node)
 
 
 def export_dot(f, influences, dependencies, order_only, performance, indirect_influences, docs):
