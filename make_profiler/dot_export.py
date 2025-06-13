@@ -7,6 +7,9 @@ import math
 from subprocess import Popen, PIPE
 from graphviz import Digraph
 
+# Build DOT graphs using the ``graphviz`` library to ensure that
+# node names and attributes are properly escaped.
+
 def critical_path(influences, dependencies, inputs, timing):
     targets = dict()
     update_queue = list(inputs)
