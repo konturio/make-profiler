@@ -70,8 +70,7 @@ def export_report(performance, docs, targets):
             if last_event_time == '':
                 last_event_time = None
 
-            if not "log" in rec:
-                rec["log"] = ""
+            log_path = rec.get("log", "")
 
             status.append(
                 {"targetName": key,
@@ -80,7 +79,7 @@ def export_report(performance, docs, targets):
                  "targetTime": event_time,
                  "targetDuration": event_duration,
                  "lastTargetCompletionTime": last_event_time,
-                 "targetLog": rec["log"]
+                 "targetLog": log_path
                  }
             )
 
