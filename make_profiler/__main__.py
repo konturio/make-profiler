@@ -88,12 +88,13 @@ def main(argv=sys.argv[1:]):
         logger.info(' '.join(cmd))
         subprocess.call(cmd)
 
-    docs = dict([
-        (i[1]['target'], i[1]['docs'])
-        for i in ast if i[0] == 'target'
-    ])
+    docs = {}
+    for item_type, data in ast:
+        if item_type == 'target':
+            for t in data.get('targets', [data['target']]):
+                docs[t] = data['docs']
     performance = parse_timing_db(args.db_filename, args.after_date)
-    deps, influences, order_only, indirect_influences = get_dependencies_influences(ast)
+    deps, influences, order_only, indirect_influences, groups = get_dependencies_influences(ast)
 
     dot_file = io.StringIO()
 
@@ -104,7 +105,8 @@ def main(argv=sys.argv[1:]):
         order_only,
         performance,
         indirect_influences,
-        docs
+        docs,
+        groups,
     )
     dot_file.seek(0)
 

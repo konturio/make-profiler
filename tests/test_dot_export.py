@@ -9,12 +9,12 @@ def build_sample():
     performance = {}
     indirect = {'a': set(), 'b': set()}
     docs = {'a': 'A doc', 'b': 'B doc'}
-    return influences, dependencies, order_only, performance, indirect, docs
+    return influences, dependencies, order_only, performance, indirect, docs, {}
 
 def test_export_contains_edge_and_clusters():
-    inf, deps, order, perf, ind, docs = build_sample()
+    inf, deps, order, perf, ind, docs, groups = build_sample()
     f = io.StringIO()
-    export_dot(f, inf, deps, order, perf, ind, docs)
+    export_dot(f, inf, deps, order, perf, ind, docs, groups)
     data = f.getvalue()
     assert 'b -> a' in data
     assert 'subgraph cluster_inputs' in data
@@ -29,7 +29,7 @@ def test_export_escapes_special_chars():
     ind = {'a"b': set()}
     docs = {'a"b': 'A "quote" doc'}
     f = io.StringIO()
-    export_dot(f, inf, deps, order, perf, ind, docs)
+    export_dot(f, inf, deps, order, perf, ind, docs, {})
     data = f.getvalue()
     assert '"a\\"b"' in data
     assert 'A \\"quote\\" doc' in data
@@ -40,7 +40,7 @@ def test_critical_path_handles_final_targets():
     inf = {'a': set()}
     deps = {'a': [[], []]}
     f = io.StringIO()
-    export_dot(f, inf, deps, set(), {}, {'a': set()}, {'a': 'Doc'})
+    export_dot(f, inf, deps, set(), {}, {'a': set()}, {'a': 'Doc'}, {})
     data = f.getvalue()
     assert 'subgraph cluster_tools' in data
 
@@ -48,11 +48,23 @@ def test_critical_path_handles_final_targets():
 def test_example_makefile_from_readme():
     with open('test/example.mk', encoding='utf-8') as fh:
         ast = parser.parse(fh)
-    deps, influences, order_only, indirect = parser.get_dependencies_influences(ast)
+    deps, influences, order_only, indirect, groups = parser.get_dependencies_influences(ast)
     docs = {i[1]['target']: i[1]['docs'] for i in ast if i[0] == parser.Tokens.target}
     f = io.StringIO()
-    export_dot(f, influences, deps, order_only, {}, indirect, docs)
+    export_dot(f, influences, deps, order_only, {}, indirect, docs, groups)
     data = f.getvalue()
     assert 'target1 -> all' in data
     assert 'subgraph cluster_inputs' in data
     assert 'label=Input' in data
+
+
+def test_grouped_targets_render_as_one_node():
+    mk = 'foo bar &: baz\n\t@true\n'
+    ast = parser.parse(io.StringIO(mk))
+    deps, influences, order_only, indirect, groups = parser.get_dependencies_influences(ast)
+    docs = {'foo': '', 'bar': ''}
+    f = io.StringIO()
+    export_dot(f, influences, deps, order_only, {}, indirect, docs, groups)
+    data = f.getvalue()
+    assert '"foo bar"' in data
+    assert 'foo' not in data.replace('"foo bar"', '')
