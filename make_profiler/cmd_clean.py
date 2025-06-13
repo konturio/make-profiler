@@ -51,10 +51,19 @@ def main(argv=sys.argv[1:]):
     ast = parse(in_file)
     deps, influences, order_only, indirect_influences = get_dependencies_influences(ast)
 
+    exit_code = 0
+
     for target in args.targets:
+        if target not in influences:
+            logging.error('Target %s not found', target)
+            exit_code = 1
+            continue
+
         rm_node(target)
         clean_target(target, influences)
 
+    return exit_code
+
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())
