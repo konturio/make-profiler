@@ -66,12 +66,23 @@ def validate_orphan_targets(targets: List[TargetData], deps: Set[str]) -> bool:
 
 
 def validate_spaces(lines: List[str]) -> bool:
+    """Validate that no line starts with spaces.
+
+    Lines that are a continuation of the previous one (the previous line
+    ends with a backslash) are ignored as Makefiles often indent continued
+    dependencies with spaces for readability.
+    """
+
     is_valid = True
 
-    regex = re.compile(r'^(?!\t[^\s]|[^\s]) | \n')
-    for i, l in enumerate(lines):
-        if re.match(regex, l):
-            print(f"Line with extra spaces ({i}): {l}")
+    for i, line in enumerate(lines):
+        if not line:  # ignore empty lines
+            continue
+        # allow leading spaces if previous line ends with a backslash
+        if i > 0 and lines[i - 1].rstrip().endswith("\\"):
+            continue
+        if line.startswith(" "):
+            print(f"Line with extra spaces ({i}): {line}")
             is_valid = False
 
     return is_valid
