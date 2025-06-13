@@ -26,6 +26,7 @@ def parse_args():
 class TargetData:
     name: str
     doc: str
+    multi_colon: bool = False
 
 
 def parse_targets(ast: List[Tuple[str, Dict]]) -> Tuple[List[TargetData], Set[str], Dict[str, Set[str]]]:
@@ -37,13 +38,18 @@ def parse_targets(ast: List[Tuple[str, Dict]]) -> Tuple[List[TargetData], Set[st
         if token_type != "target":
             continue
 
-        name = data["target"]
-        target_data.append(TargetData(name=name, doc=data["docs"]))
+        names = data.get("targets", [data["target"]])
+        warn_multi = data.get("separator", ":") == ":" and len(names) > 1
+        for i, name in enumerate(names):
+            target_data.append(
+                TargetData(name=name, doc=data["docs"], multi_colon=warn_multi and i == 0)
+            )
 
         for dep_arr in data["deps"]:
             for item in dep_arr:
                 deps_targets.add(item)
-                deps_map[item].add(name)
+                for name in names:
+                    deps_map[item].add(name)
 
     return target_data, deps_targets, deps_map
 
@@ -101,6 +107,27 @@ def validate_missing_rules(
     return is_valid
 
 
+def validate_multitarget_colon(
+    targets: List[TargetData],
+    *args,
+    errors: List[str] | None = None,
+) -> bool:
+    """Warn if multiple targets share a recipe using ':' instead of '&:'."""
+    is_valid = True
+    for t in targets:
+        if t.multi_colon:
+            msg = (
+                "Multiple targets defined with ':' may run several times in parallel. "
+                "Use '&:' to group them: "
+                f"{t.name}"
+            )
+            print(msg)
+            if errors is not None:
+                errors.append(msg)
+            is_valid = False
+    return is_valid
+
+
 def validate_spaces(lines: List[str], *, errors: List[str] | None = None) -> bool:
     """Validate that there are no unwanted spaces in Makefile lines.
 
@@ -143,6 +170,7 @@ TARGET_VALIDATORS: Callable[[List[TargetData], Set[str], Dict[str, Set[str]]], b
     validate_orphan_targets,
     validate_target_comments,
     validate_missing_rules,
+    validate_multitarget_colon,
 ]
 TEXT_VALIDATORS: Callable[[List[str]], bool] = [validate_spaces]
 

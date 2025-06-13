@@ -129,12 +129,59 @@ def dot_node(graph, name, performance, docstring, cp, *, invisible=False):
     graph.node(name, **{k: str(v) for k, v in node.items()})
 
 
-def export_dot(f, influences, dependencies, order_only, performance, indirect_influences, docs):
+def export_dot(
+    f,
+    influences,
+    dependencies,
+    order_only,
+    performance,
+    indirect_influences,
+    docs,
+    groups=None,
+):
+    if groups:
+        def a(name: str) -> str:
+            return groups.get(name, name)
+
+        new_influences = collections.defaultdict(set)
+        for k, vs in influences.items():
+            ak = a(k)
+            for v in vs:
+                new_influences[ak].add(a(v))
+        influences = new_influences
+
+        new_dependencies = {}
+        for t, (deps, order_deps) in dependencies.items():
+            at = a(t)
+            tgt = new_dependencies.setdefault(at, [set(), set()])
+            tgt[0].update(a(d) for d in deps)
+            tgt[1].update(a(d) for d in order_deps)
+        dependencies = {k: [sorted(v[0]), sorted(v[1])] for k, v in new_dependencies.items()}
+
+        order_only = {a(x) for x in order_only}
+
+        new_indirect = collections.defaultdict(set)
+        for t, vs in indirect_influences.items():
+            at = a(t)
+            new_indirect[at].update(a(v) for v in vs)
+        indirect_influences = new_indirect
+
+        new_docs = {}
+        for t, doc in docs.items():
+            new_docs.setdefault(a(t), doc)
+        docs = new_docs
+
+        new_performance = {}
+        for t, p in performance.items():
+            at = a(t)
+            if at not in new_performance:
+                new_performance[at] = p
+        performance = new_performance
     dot = Digraph('G')
     dot.attr(rankdir='BT', ratio='0.5625', newrank='true')
     dot.attr('node', shape='box')
 
-    groups = collections.defaultdict(set)
+    clusters = collections.defaultdict(set)
 
     # look for keys that aren't linked
     inputs = set(influences.keys())
@@ -157,9 +204,9 @@ def export_dot(f, influences, dependencies, order_only, performance, indirect_in
 
     for target, infls in influences.items():
         group = classify_target(target, infls, dependencies, inputs, order_only)
-        groups[group].add(target)
+        clusters[group].add(target)
 
-    for k, v in sorted(groups.items()):
+    for k, v in sorted(clusters.items()):
         label = labels.get(k, '')
         with dot.subgraph(name=k) as sg:
             if label:
@@ -190,7 +237,7 @@ def export_dot(f, influences, dependencies, order_only, performance, indirect_in
     dot.edge('cluster_inputs_DUMMY', 'cluster_tools_DUMMY', style='invis')
     dot.edge('cluster_tools_DUMMY', 'cluster_result_DUMMY', style='invis')
 
-    if 'cluster_not_implemented' in groups:
+    if 'cluster_not_implemented' in clusters:
         dot.edge('cluster_inputs_DUMMY', 'cluster_not_implemented_DUMMY', style='invis')
         dot.edge('cluster_not_implemented_DUMMY', 'cluster_tools_DUMMY', style='invis')
         dot.edge('cluster_not_implemented_DUMMY', 'cluster_order_only_DUMMY', style='invis')

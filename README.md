@@ -18,6 +18,7 @@ Helps managing a large data processing pipeline written in Makefile.
 
 - Navigate to last run's logs from each target directly from call graph;
 
+- Grouped targets using `&:` are displayed as one node;
 - Support for self-documented Makefiles according to
   http://marmelab.com/blog/2016/02/29/auto-documented-makefile.html
 

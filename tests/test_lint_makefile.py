@@ -43,3 +43,37 @@ def test_main_reports_summary(tmp_path, monkeypatch, capsys):
     assert "no rule to make target 'foo', needed by 'all'" in captured.err
 
 
+def test_grouped_targets_parsed():
+    mk = "foo bar &: baz\n\t@echo hi\n"
+    ast = parser.parse(io.StringIO(mk))
+    token_type, data = ast[0]
+    assert token_type == parser.Tokens.target
+    assert data["targets"] == ["foo", "bar"]
+    assert data["separator"] == "&:"
+
+
+def test_lint_warns_on_multi_colon(capsys):
+    mk = "foo bar: baz\n"
+    ast = parser.parse(io.StringIO(mk))
+    targets, deps, dep_map = lint_makefile.parse_targets(ast)
+    valid = lint_makefile.validate(mk.split("\n"), targets, deps, dep_map)
+    captured = capsys.readouterr()
+    assert not valid
+    assert "Use '&:' to group" in captured.out
+
+
+def test_lint_accepts_grouped_targets(capsys):
+    mk = (
+        "all: foo bar ## [FINAL] doc\n"
+        "foo bar &: baz ## docs\n"
+        "\t@true\n"
+        "baz: ## dep doc\n"
+        "\t@true\n"
+    )
+    ast = parser.parse(io.StringIO(mk))
+    targets, deps, dep_map = lint_makefile.parse_targets(ast)
+    valid = lint_makefile.validate(mk.split("\n"), targets, deps, dep_map)
+    captured = capsys.readouterr()
+    assert valid, captured.out
+
+

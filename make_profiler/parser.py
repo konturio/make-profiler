@@ -124,23 +124,48 @@ def parse(fd: TextIO, is_check_loop: bool = True, loop_check_depth: int = 20) ->
 
     def parse_target(token: Tuple[Tokens, str]):
         line = token[1]
-        target, deps, order_deps, docstring = re.match(
-            r'(.+?): \s? ([^|#]+)? \s? [|]? \s? ([^##]+)? \s?  \s? ([#][#].+)?',
-            line,
-            re.X
-        ).groups()
+
+        # Extract documentation comment if present
+        docstring = ''
+        m = re.search(r'(##.*)$', line)
+        if m:
+            docstring = m.group(1).lstrip('#').strip()
+            line = line[: m.start()].rstrip()
+
+        # Separate target list from the rest of the rule
+        target_part, rest = line.split(':', 1)
+
+        target_part = target_part.rstrip()
+        ampersand = False
+        if target_part.endswith('&'):
+            ampersand = True
+            target_part = target_part[:-1].rstrip()
+
+        targets = target_part.split()
+
+        deps_part = rest.strip()
+        order_deps_part = ''
+        if '|' in deps_part:
+            deps_part, order_deps_part = deps_part.split('|', 1)
+        deps = sorted(deps_part.strip().split()) if deps_part.strip() else []
+        order_deps = (
+            sorted(order_deps_part.strip().split()) if order_deps_part.strip() else []
+        )
+
         body = parse_body()
-        ast.append((
-            token[0],
-            {
-                'target': target.strip(),
-                'deps': [
-                    sorted(deps.strip().split()) if deps else [],
-                    sorted(order_deps.strip().split()) if order_deps else []
-                ],
-                'docs': docstring.strip().strip('#').strip() if docstring else '',
-                'body': body
-            })
+
+        ast.append(
+            (
+                token[0],
+                {
+                    'target': targets[0],
+                    'targets': targets,
+                    'separator': '&:' if ampersand else ':',
+                    'deps': [deps, order_deps],
+                    'docs': docstring,
+                    'body': body,
+                },
+            )
         )
 
     def next_belongs_to_target() -> bool:
@@ -171,22 +196,31 @@ def get_dependencies_influences(ast: List[Tuple[Tokens, Dict[str, Any]]]):
     influences = collections.defaultdict(set)
     order_only = set()
     indirect_influences = collections.defaultdict(set)
+    groups = {}
 
     for item_t, item in ast:
         if item_t != Tokens.target:
             continue
-        target = item['target']
+        targets = item.get('targets', [item['target']])
         deps, order_deps = item['deps']
+        if item.get('separator') == '&:' and len(targets) > 1:
+            group_name = ' '.join(targets)
+            for t in targets:
+                groups[t] = group_name
+        else:
+            group_name = None
 
-        if target in ('.PHONY',):
-            continue
+        for target in targets:
+            if target in ('.PHONY',):
+                continue
 
-        dependencies[target] = [deps, order_deps]
+            dependencies[target] = [deps, order_deps]
 
-        # influences
-        influences[target]
+            # influences
+            influences[target]
         for k in deps:
-            influences[k].add(target)
+            for target in targets:
+                influences[k].add(target)
         for k in order_deps:
             influences[k]
         order_only.update(order_deps)
@@ -200,5 +234,5 @@ def get_dependencies_influences(ast: List[Tuple[Tokens, Dict[str, Any]]]):
         for t in targets:
             recurse_indirect_influences(original_target, t)
 
-    return dependencies, influences, order_only, indirect_influences
+    return dependencies, influences, order_only, indirect_influences, groups
     

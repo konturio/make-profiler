@@ -49,7 +49,7 @@ def main(argv=sys.argv[1:]):
     in_file = open(args.in_filename, 'r') if args.in_filename else sys.stdin
 
     ast = parse(in_file)
-    deps, influences, order_only, indirect_influences = get_dependencies_influences(ast)
+    deps, influences, order_only, indirect_influences, _ = get_dependencies_influences(ast)
 
     exit_code = 0
 
