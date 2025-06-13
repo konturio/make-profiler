@@ -36,7 +36,7 @@ def test_export_escapes_special_chars():
 
 
 def test_example_makefile_from_readme():
-    with open('test/example.mk') as fh:
+    with open('test/example.mk', encoding='utf-8') as fh:
         ast = parser.parse(fh)
     deps, influences, order_only, indirect = parser.get_dependencies_influences(ast)
     docs = {i[1]['target']: i[1]['docs'] for i in ast if i[0] == parser.Tokens.target}

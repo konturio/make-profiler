@@ -87,11 +87,11 @@ def classify_target(name, influences, dependencies, inputs, order_only):
     return group
 
 
-def dot_node(graph, name, performance, docstring, cp):
+def dot_node(graph, name, performance, docstring, cp, *, invisible=False):
     """Add a node to *graph* with attributes derived from performance data."""
     node = {
         'label': name,
-        'fontsize': '10',
+        'fontsize': 10,
         'color': 'black',
         'fillcolor': '#d3d3d3'
     }
@@ -115,13 +115,15 @@ def dot_node(graph, name, performance, docstring, cp):
     node['group'] = '/'.join(name.split('/')[:2])
     node['shape'] = 'box'
     node['style'] = 'filled'
+    if invisible:
+        node['style'] = 'invis'
     # generate title as target name when docstring is empty
     node['tooltip'] = docstring if docstring else name
     if name[-4:] == '.png' and os.path.exists(name):
         node['image'] = name
         node['imagescale'] = 'true'
         node['width'] = '1'
-    graph.node(name, **node)
+    graph.node(name, **{k: str(v) for k, v in node.items()})
 
 
 def export_dot(f, influences, dependencies, order_only, performance, indirect_influences, docs):
@@ -166,6 +168,8 @@ def export_dot(f, influences, dependencies, order_only, performance, indirect_in
                 sg.attr(rank='source')
             if k == 'cluster_order_only':
                 hidden_nodes = v
+                for t in v:
+                    dot_node(sg, t, performance, docs.get(t, t), cp, invisible=True)
             else:
                 for t in v:
                     dot_node(sg, t, performance, docs.get(t, t), cp)
@@ -191,7 +195,7 @@ def export_dot(f, influences, dependencies, order_only, performance, indirect_in
     def format_deciminutes(k):
         hrs = math.floor(k / 6)
         minutes = (k % 6) * 10
-        return '%s:%02d' % (hrs, minutes)
+        return f"{hrs}:{minutes:02d}"
 
     for k, v in timing_tags.items():
         with dot.subgraph() as sg:
