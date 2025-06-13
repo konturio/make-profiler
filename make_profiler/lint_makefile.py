@@ -1,6 +1,7 @@
 import argparse
 import re
 
+import sys
 from typing import Callable, Dict, List, Set, Tuple
 
 from make_profiler.parser import parse
@@ -47,43 +48,60 @@ def parse_targets(ast: List[Tuple[str, Dict]]) -> Tuple[List[TargetData], Set[st
     return target_data, deps_targets, deps_map
 
 
-def validate_target_comments(targets: List[TargetData], *args) -> bool:
+def validate_target_comments(targets: List[TargetData], *args, errors: List[str] | None = None) -> bool:
+    """Ensure that every target has documentation."""
     is_valid = True
 
     for t in targets:
         if not t.doc:
-            print(f"Target without comments: {t.name}")
+            msg = f"Target without comments: {t.name}"
+            print(msg)
+            if errors is not None:
+                errors.append(msg)
             is_valid = False
 
     return is_valid
 
 
-def validate_orphan_targets(targets: List[TargetData], deps: Set[str], *args) -> bool:
+def validate_orphan_targets(targets: List[TargetData], deps: Set[str], *args, errors: List[str] | None = None) -> bool:
+    """Check that every target is used or explicitly marked as FINAL."""
     is_valid = True
-    
+
     for t in targets:
-        if t.name not in deps:
-            if "[FINAL]" not in t.doc:
-                print(f"{t.name}, is orphan - not marked as [FINAL] and no other target depends on it")
-                is_valid = False
+        if t.name not in deps and "[FINAL]" not in t.doc:
+            msg = f"{t.name}, is orphan - not marked as [FINAL] and no other target depends on it"
+            print(msg)
+            if errors is not None:
+                errors.append(msg)
+            is_valid = False
 
     return is_valid
 
 
-def validate_missing_rules(targets: List[TargetData], deps: Set[str], deps_map: Dict[str, Set[str]]) -> bool:
+def validate_missing_rules(
+    targets: List[TargetData],
+    deps: Set[str],
+    deps_map: Dict[str, Set[str]],
+    *,
+    errors: List[str] | None = None,
+) -> bool:
+    """Report dependencies that do not have a rule or a file backing them."""
     is_valid = True
 
     target_names = {t.name for t in targets}
     for dep in deps:
         if dep not in target_names and not os.path.exists(dep):
             for parent in sorted(deps_map.get(dep, [])):
-                print(f"No rule to make target '{dep}', needed by '{parent}'")
+                msg = f"No rule to make target '{dep}', needed by '{parent}'"
+                print(msg)
+                if errors is not None:
+                    errors.append(msg)
             is_valid = False
 
     return is_valid
 
 
-def validate_spaces(lines: List[str]) -> bool:
+def validate_spaces(lines: List[str], *, errors: List[str] | None = None) -> bool:
     """Validate that there are no unwanted spaces in Makefile lines.
 
     Spaces at the beginning of a line are normally disallowed.  However
@@ -102,12 +120,18 @@ def validate_spaces(lines: List[str]) -> bool:
         if prev_line.rstrip().endswith("\\"):
             prev_line = line
             if line.rstrip() != line:
-                print(f"Line with extra spaces ({i}): {line}")
+                msg = f"Line with extra spaces ({i}): {line}"
+                print(msg)
+                if errors is not None:
+                    errors.append(msg)
                 is_valid = False
             continue
 
         if line.rstrip() != line or (line.startswith(" ") and not line.startswith("\t")):
-            print(f"Line with extra spaces ({i}): {line}")
+            msg = f"Line with extra spaces ({i}): {line}"
+            print(msg)
+            if errors is not None:
+                errors.append(msg)
             is_valid = False
 
         prev_line = line
@@ -123,14 +147,22 @@ TARGET_VALIDATORS: Callable[[List[TargetData], Set[str], Dict[str, Set[str]]], b
 TEXT_VALIDATORS: Callable[[List[str]], bool] = [validate_spaces]
 
 
-def validate(makefile_lines: List[str], targets: List[TargetData], deps: Set[str], deps_map: Dict[str, Set[str]]):
+def validate(
+    makefile_lines: List[str],
+    targets: List[TargetData],
+    deps: Set[str],
+    deps_map: Dict[str, Set[str]],
+    *,
+    errors: List[str] | None = None,
+) -> bool:
+    """Run all validators and collect error messages."""
     is_valid = True
 
     for validator in TEXT_VALIDATORS:
-        is_valid = validator(makefile_lines) and is_valid
+        is_valid = validator(makefile_lines, errors=errors) and is_valid
 
     for validator in TARGET_VALIDATORS:
-        is_valid = validator(targets, deps, deps_map) and is_valid
+        is_valid = validator(targets, deps, deps_map, errors=errors) and is_valid
 
     return is_valid
 
@@ -148,9 +180,19 @@ def main():
 
     targets, deps, deps_map = parse_targets(ast)
 
-    if not validate(makefile_lines, targets, deps, deps_map):
-        raise ValueError(f"Houston, we have a problem.")
+    errors: List[str] = []
+    if not validate(makefile_lines, targets, deps, deps_map, errors=errors):
+        counts = collections.Counter(msg.split(':')[0] for msg in errors)
+        summary_parts = []
+        for name, count in counts.items():
+            label = name.strip().lower()
+            summary_parts.append(f"{count} {label}{'' if label.endswith('s') else 's'}")
+        summary = '; '.join(summary_parts)
+        print(f"Makefile validation failed: {summary}", file=sys.stderr)
+        return 1
+
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

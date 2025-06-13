@@ -1,4 +1,5 @@
 import io
+import pytest
 from make_profiler import parser, lint_makefile
 
 
@@ -28,5 +29,17 @@ def test_spaces_after_multiline_continuation(capsys):
     valid = lint_makefile.validate(mk.split('\n'), targets, deps, dep_map)
     captured = capsys.readouterr()
     assert valid, captured.out
+
+
+def test_main_reports_summary(tmp_path, monkeypatch, capsys):
+    mk = "all: foo\n"
+    mfile = tmp_path / "Makefile"
+    mfile.write_text(mk)
+    monkeypatch.setattr("sys.argv", ["profile_make_lint", "--in_filename", str(mfile)])
+    ret = lint_makefile.main()
+    captured = capsys.readouterr()
+    assert ret == 1
+    assert "validation failed" in captured.err.lower()
+    assert "no rule to make target 'foo', needed by 'all'" in captured.err
 
 
