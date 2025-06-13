@@ -155,9 +155,6 @@ def export_dot(f, influences, dependencies, order_only, performance, indirect_in
         groups[group].add(target)
 
     for k, v in sorted(groups.items()):
-        if k == 'cluster_order_only':
-            hidden_nodes = v
-            continue
         label = labels.get(k, '')
         with dot.subgraph(name=k) as sg:
             if label:
@@ -167,8 +164,11 @@ def export_dot(f, influences, dependencies, order_only, performance, indirect_in
                 sg.attr(rank='sink')
             if k == 'cluster_tools':
                 sg.attr(rank='source')
-            for t in v:
-                dot_node(sg, t, performance, docs.get(t, t), cp)
+            if k == 'cluster_order_only':
+                hidden_nodes = v
+            else:
+                for t in v:
+                    dot_node(sg, t, performance, docs.get(t, t), cp)
             sg.node(f"{k}_DUMMY", shape='point', style='invis')
 
     for k, v in influences.items():
@@ -190,8 +190,8 @@ def export_dot(f, influences, dependencies, order_only, performance, indirect_in
 
     def format_deciminutes(k):
         hrs = math.floor(k / 6)
-        min = (k %6)*10
-        return '%s:%02d'%(hrs,min)
+        minutes = (k % 6) * 10
+        return '%s:%02d' % (hrs, minutes)
 
     for k, v in timing_tags.items():
         with dot.subgraph() as sg:
