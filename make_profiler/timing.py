@@ -62,3 +62,55 @@ def parse_timing_db(filename, after_date=None):
             else:
                 targets[target]['timing_sec'] = targets[target]['finish_prev'] - targets[target]['start_prev']
     return targets
+
+
+def analyze_target(filename, target_name):
+    """Return statistics about target execution history."""
+    if not os.path.isfile(filename):
+        return None
+
+    starts = {}
+    durations = []
+    start_count = 0
+    finish_count = 0
+
+    with open(filename) as f:
+        for line in f:
+            parts = line.strip().split()
+            if len(parts) != 4:
+                continue
+            timestamp, bid, action, target = parts
+            if target != target_name:
+                continue
+            ts = float(timestamp)
+            if action == 'start':
+                starts[bid] = ts
+                start_count += 1
+            elif action == 'finish':
+                if bid in starts:
+                    finish_count += 1
+                    durations.append(ts - starts.pop(bid))
+
+    if durations:
+        durations_sorted = sorted(durations)
+        max_d = max(durations)
+        min_d = min(durations)
+        avg_d = sum(durations) / len(durations)
+        mid = len(durations_sorted) // 2
+        if len(durations_sorted) % 2:
+            median_d = durations_sorted[mid]
+        else:
+            median_d = (durations_sorted[mid - 1] + durations_sorted[mid]) / 2
+        last_d = durations[-1]
+    else:
+        max_d = min_d = avg_d = median_d = last_d = 0
+
+    return {
+        'starts': start_count,
+        'finishes': finish_count,
+        'max': max_d,
+        'min': min_d,
+        'avg': avg_d,
+        'median': median_d,
+        'last': last_d,
+    }

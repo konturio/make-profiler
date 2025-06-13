@@ -9,7 +9,7 @@ from datetime import datetime
 from make_profiler.dot_export import export_dot, render_dot
 from make_profiler.parser import parse, get_dependencies_influences
 from make_profiler.preprocess import generate_makefile
-from make_profiler.timing import parse_timing_db
+from make_profiler.timing import parse_timing_db, analyze_target
 from make_profiler.report_export import export_report
 
 logging.basicConfig(level=logging.INFO)
@@ -46,6 +46,12 @@ def main(argv=sys.argv[1:]):
         default='make.svg',
         help='rendered report image filename (default: make.svg)')
     parser.add_argument(
+        '--analyze',
+        metavar='TARGET',
+        dest='analyze_target',
+        type=str,
+        help='Print execution statistics for TARGET and exit')
+    parser.add_argument(
         '-a',
         action='store',
         dest='after_date',
@@ -68,6 +74,21 @@ def main(argv=sys.argv[1:]):
     parser.add_argument('target', nargs='?')
 
     args, unknown_args = parser.parse_known_args(argv)
+
+    if args.analyze_target:
+        stats = analyze_target(args.db_filename, args.analyze_target)
+        if stats is None:
+            print('Profile database not found')
+            return
+        print('Target: {}'.format(args.analyze_target))
+        print('  starts: {}'.format(stats['starts']))
+        print('  finishes: {}'.format(stats['finishes']))
+        print('  max duration: {:.2f}s'.format(stats['max']))
+        print('  min duration: {:.2f}s'.format(stats['min']))
+        print('  avg duration: {:.2f}s'.format(stats['avg']))
+        print('  median duration: {:.2f}s'.format(stats['median']))
+        print('  last duration: {:.2f}s'.format(stats['last']))
+        return
 
     in_file = open(args.in_filename, 'r')
     if args.preprocess_only:

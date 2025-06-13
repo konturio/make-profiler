@@ -44,4 +44,6 @@ Helps managing a large data processing pipeline written in Makefile.
 
     profile_make_init_viewer -o="~/public_html"   # Create files for web-based dashboard in the public_html folder.
 
+    profile_make --analyze target_name   # show historical run time statistics for target_name
+
     
