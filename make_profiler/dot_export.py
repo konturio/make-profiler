@@ -100,12 +100,16 @@ def dot_node(graph, name, performance, docstring, cp, *, invisible=False):
     }
     if name in performance:
         target_performance = performance[name]
-        if target_performance['done']:
+        # Mark targets built in the current run with a dedicated color.
+        if target_performance.get('failed'):
+            node['fillcolor'] = '.05 .3 1.0'
+        elif target_performance.get('current'):
+            node['fillcolor'] = '#0969DA'
+            node['fontcolor'] = '#fff'
+        elif target_performance.get('done'):
             node['fillcolor'] = '.7 .3 1.0'
             if target_performance['isdir']:
                 node['fillcolor'] = '.2 .3 1.0'
-        if target_performance['failed']:
-            node['fillcolor'] = '.05 .3 1.0'
         timing_sec = target_performance.get('timing_sec', 0)
         timing = str(datetime.timedelta(seconds=int(timing_sec)))
         if 'log' in target_performance:

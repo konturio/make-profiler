@@ -56,3 +56,16 @@ def test_example_makefile_from_readme():
     assert 'target1 -> all' in data
     assert 'subgraph cluster_inputs' in data
     assert 'label=Input' in data
+
+
+def test_current_targets_are_highlighted():
+    inf, deps, order, _, ind, docs = build_sample()
+    perf = {
+        'a': {'done': True, 'failed': False, 'isdir': False, 'current': True},
+        'b': {'done': True, 'failed': False, 'isdir': False, 'current': False},
+    }
+    f = io.StringIO()
+    export_dot(f, inf, deps, order, perf, ind, docs)
+    data = f.getvalue()
+    assert 'fillcolor="#0969DA"' in data
+    assert 'fontcolor="#fff"' in data

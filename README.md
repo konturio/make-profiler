@@ -16,6 +16,8 @@ Helps managing a large data processing pipeline written in Makefile.
 
 - Distinguish a failed target execution from forgotten touch;
 
+- Targets built in the current run are highlighted separately;
+
 - Navigate to last run's logs from each target directly from call graph;
 
 - Support for self-documented Makefiles according to
