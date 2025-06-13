@@ -35,6 +35,16 @@ def test_export_escapes_special_chars():
     assert 'A \\"quote\\" doc' in data
 
 
+def test_critical_path_handles_final_targets():
+    """Ensure graph export works when a root target has no dependents."""
+    inf = {'a': set()}
+    deps = {'a': [[], []]}
+    f = io.StringIO()
+    export_dot(f, inf, deps, set(), {}, {'a': set()}, {'a': 'Doc'})
+    data = f.getvalue()
+    assert 'subgraph cluster_tools' in data
+
+
 def test_example_makefile_from_readme():
     with open('test/example.mk', encoding='utf-8') as fh:
         ast = parser.parse(fh)
