@@ -84,13 +84,33 @@ def validate_missing_rules(targets: List[TargetData], deps: Set[str], deps_map: 
 
 
 def validate_spaces(lines: List[str]) -> bool:
-    is_valid = True
+    """Validate that there are no unwanted spaces in Makefile lines.
 
-    regex = re.compile(r'^(?!\t[^\s]|[^\s]) | \n')
-    for i, l in enumerate(lines):
-        if re.match(regex, l):
-            print(f"Line with extra spaces ({i}): {l}")
+    Spaces at the beginning of a line are normally disallowed.  However
+    Make allows a backslash (``\``) at the end of a line to indicate that
+    the statement continues on the next line.  In such cases the
+    following line usually begins with spaces for readability.  These
+    spaces should not be considered an error.
+    """
+
+    is_valid = True
+    prev_line = ""
+
+    for i, line in enumerate(lines):
+        # Skip the check for leading spaces if the previous line ends with
+        # a continuation character.  Trailing spaces are still reported.
+        if prev_line.rstrip().endswith("\\"):
+            prev_line = line
+            if line.rstrip() != line:
+                print(f"Line with extra spaces ({i}): {line}")
+                is_valid = False
+            continue
+
+        if line.rstrip() != line or (line.startswith(" ") and not line.startswith("\t")):
+            print(f"Line with extra spaces ({i}): {line}")
             is_valid = False
+
+        prev_line = line
 
     return is_valid
 
