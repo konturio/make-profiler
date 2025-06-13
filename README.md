@@ -37,7 +37,7 @@ Helps managing a large data processing pipeline written in Makefile.
     profile_make_clean target_to_remove_with_children
     # prints an error when the target is missing
 
-    profile_make_lint               # validate Makefile to find orphan targets
+    profile_make_lint               # validate Makefile to find orphan targets and missing rules
     profile_make -j -k target_name  # run some target, record execution times and logs
     xdg-open make.svg               # have a look at call graph with timing data
 
