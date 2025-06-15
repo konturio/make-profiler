@@ -7,7 +7,7 @@ def run_validation(mk: str) -> tuple[bool, list[lint_makefile.LintError]]:
     ast = parser.parse(io.StringIO(mk))
     targets, deps, dep_map = lint_makefile.parse_targets(ast)
     errors: list[lint_makefile.LintError] = []
-    valid = lint_makefile.validate(mk.split('\n'), targets, deps, dep_map, errors=errors)
+    valid = lint_makefile.validate(mk.splitlines(), targets, deps, dep_map, errors=errors)
     return valid, errors
 
 
@@ -15,7 +15,7 @@ def test_missing_rule():
     mk = "all: foo\n"
     valid, errors = run_validation(mk)
     assert not valid
-    assert any(err.type == "missing rule" for err in errors)
+    assert any(err.error_type == "missing rule" for err in errors)
 
 
 def test_spaces_after_multiline_continuation():
@@ -42,7 +42,7 @@ def test_trailing_spaces():
     )
     valid, errors = run_validation(mk)
     assert not valid
-    assert any(err.type == "trailing spaces" for err in errors)
+    assert any(err.error_type == "trailing spaces" for err in errors)
 
 
 def test_space_instead_of_tab():
@@ -52,7 +52,7 @@ def test_space_instead_of_tab():
     )
     valid, errors = run_validation(mk)
     assert not valid
-    assert any(err.type == "space instead of tab" for err in errors)
+    assert any(err.error_type == "space instead of tab" for err in errors)
 
 
 def test_error_includes_line_info():
@@ -62,9 +62,9 @@ def test_error_includes_line_info():
     )
     valid, errors = run_validation(mk)
     assert not valid
-    trailing = next(err for err in errors if err.type == "trailing spaces")
+    trailing = next(err for err in errors if err.error_type == "trailing spaces")
     expected_line = next(
-        i for i, line in enumerate(mk.split("\n")) if line.endswith("  ")
+        i for i, line in enumerate(mk.splitlines()) if line.endswith("  ")
     )
     assert trailing.line_number == expected_line
     assert trailing.line_text.endswith("  ")
@@ -74,7 +74,7 @@ def test_orphan_and_no_docs():
     mk = "foo:\n\t@echo foo\n"
     valid, errors = run_validation(mk)
     assert not valid
-    types = {e.type for e in errors}
+    types = {e.error_type for e in errors}
     assert "orphan target" in types
     assert "target without comments" in types
 
@@ -93,10 +93,10 @@ def test_main_reports_summary(tmp_path, monkeypatch, capsys):
 
 def test_summary_counts_similar_errors():
     errors = [
-        lint_makefile.LintError(type="space instead of tab", message=""),
-        lint_makefile.LintError(type="space instead of tab", message=""),
-        lint_makefile.LintError(type="space instead of tab", message=""),
-        lint_makefile.LintError(type="missing rule", message=""),
+        lint_makefile.LintError(error_type="space instead of tab", message=""),
+        lint_makefile.LintError(error_type="space instead of tab", message=""),
+        lint_makefile.LintError(error_type="space instead of tab", message=""),
+        lint_makefile.LintError(error_type="missing rule", message=""),
     ]
     summary = lint_makefile.summarize_errors(errors)
     assert "space instead of tab: 3" in summary

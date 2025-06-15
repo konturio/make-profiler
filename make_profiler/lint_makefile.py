@@ -12,9 +12,9 @@ from dataclasses import dataclass
 
 @dataclass
 class LintError:
-    """A machine readable lint error with useful context."""
+    """A machine-readable lint error with useful context."""
 
-    type: str
+    error_type: str
     message: str
     line_number: int | None = None
     line_text: str | None = None
@@ -65,9 +65,11 @@ def validate_target_comments(targets: List[TargetData], *args, errors: List[Lint
     for t in targets:
         if not t.doc:
             msg = f"Target without comments: {t.name}"
-            print(msg)
+            print(msg, file=sys.stderr)
             if errors is not None:
-                errors.append(LintError(type="target without comments", message=msg))
+                errors.append(
+                    LintError(error_type="target without comments", message=msg),
+                )
             is_valid = False
 
     return is_valid
@@ -80,9 +82,11 @@ def validate_orphan_targets(targets: List[TargetData], deps: Set[str], *args, er
     for t in targets:
         if t.name not in deps and "[FINAL]" not in t.doc:
             msg = f"{t.name}, is orphan - not marked as [FINAL] and no other target depends on it"
-            print(msg)
+            print(msg, file=sys.stderr)
             if errors is not None:
-                errors.append(LintError(type="orphan target", message=msg))
+                errors.append(
+                    LintError(error_type="orphan target", message=msg),
+                )
             is_valid = False
 
     return is_valid
@@ -103,9 +107,11 @@ def validate_missing_rules(
         if dep not in target_names and not os.path.exists(dep):
             for parent in sorted(deps_map.get(dep, [])):
                 msg = f"No rule to make target '{dep}', needed by '{parent}'"
-                print(msg)
+                print(msg, file=sys.stderr)
                 if errors is not None:
-                    errors.append(LintError(type="missing rule", message=msg))
+                    errors.append(
+                        LintError(error_type="missing rule", message=msg),
+                    )
             is_valid = False
 
     return is_valid
@@ -131,11 +137,11 @@ def validate_spaces(lines: List[str], *, errors: List[LintError] | None = None) 
             prev_line = line
             if line.rstrip() != line:
                 msg = f"Trailing spaces ({i}): {line}"
-                print(msg)
+                print(msg, file=sys.stderr)
                 if errors is not None:
                     errors.append(
                         LintError(
-                            type="trailing spaces",
+                            error_type="trailing spaces",
                             message=msg,
                             line_number=i,
                             line_text=line,
@@ -146,11 +152,11 @@ def validate_spaces(lines: List[str], *, errors: List[LintError] | None = None) 
 
         if line.rstrip() != line:
             msg = f"Trailing spaces ({i}): {line}"
-            print(msg)
+            print(msg, file=sys.stderr)
             if errors is not None:
                 errors.append(
                     LintError(
-                        type="trailing spaces",
+                        error_type="trailing spaces",
                         message=msg,
                         line_number=i,
                         line_text=line,
@@ -160,11 +166,11 @@ def validate_spaces(lines: List[str], *, errors: List[LintError] | None = None) 
 
         if line.startswith(" ") and not line.startswith("\t"):
             msg = f"Space instead of tab ({i}): {line}"
-            print(msg)
+            print(msg, file=sys.stderr)
             if errors is not None:
                 errors.append(
                     LintError(
-                        type="space instead of tab",
+                        error_type="space instead of tab",
                         message=msg,
                         line_number=i,
                         line_text=line,
@@ -208,8 +214,18 @@ def validate(
 def summarize_errors(errors: List[LintError]) -> str:
     """Return a short summary of lint errors."""
 
-    counts = collections.Counter(err.type for err in errors)
-    parts = [f"{name}: {count}" for name, count in sorted(counts.items())]
+    counts = collections.Counter(err.error_type for err in errors)
+    first_seen: dict[str, int] = {}
+    for err in errors:
+        if err.error_type not in first_seen and err.line_number is not None:
+            first_seen[err.error_type] = err.line_number
+
+    def order(key: str) -> int:
+        return first_seen.get(key, sys.maxsize)
+
+    parts = [
+        f"{name}: {counts[name]}" for name in sorted(counts.keys(), key=order)
+    ]
     return ", ".join(parts)
 
 
