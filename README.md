@@ -9,6 +9,7 @@ Helps managing a large data processing pipeline written in Makefile.
 ![build graph example](make.png)
 
 - Critical Path is highlighted;
+- Critical Path for the latest run is shown in purple;
 
 - Inline pictures-targets into build overview;
 
