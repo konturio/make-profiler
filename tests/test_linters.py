@@ -1,9 +1,12 @@
 import subprocess
+import sys
 
 
 def test_pylint_runs_clean() -> None:
-    result = subprocess.run(
+    subprocess.run(
         [
+            sys.executable,
+            "-m",
             "pylint",
             "--disable=all",
             "--enable=E",
@@ -12,15 +15,21 @@ def test_pylint_runs_clean() -> None:
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
+        check=True,
     )
-    assert result.returncode == 0, result.stdout
 
 
 def test_ruff_runs_clean() -> None:
-    result = subprocess.run(
-        ["ruff", "check", "make_profiler/lint_makefile.py"],
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "ruff",
+            "check",
+            "make_profiler/lint_makefile.py",
+        ],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
+        check=True,
     )
-    assert result.returncode == 0, result.stdout

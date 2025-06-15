@@ -59,6 +59,7 @@ def _compute_target_lines(lines: list[str]) -> dict[str, tuple[int, str]]:
     mapping: dict[str, tuple[int, str]] = {}
     i = 0
     n = len(lines)
+    target_re = re.compile(r"(?P<target>[^:]+):")
 
     while i < n:
         line = lines[i]
@@ -75,7 +76,7 @@ def _compute_target_lines(lines: list[str]) -> dict[str, tuple[int, str]]:
             continue
 
         if ":" in line and "=" not in line:
-            m = re.match(r"(?P<target>[^:]+):", line)
+            m = target_re.match(line)
             if m:
                 names = m.group("target").split()
                 for name in names:
@@ -283,15 +284,13 @@ def validate(
     for validator in TEXT_VALIDATORS:
         is_valid = validator(makefile_lines, errors=errors) and is_valid
 
-    target_args = {
-        validate_target_comments: (targets,),
-        validate_orphan_targets: (targets, deps),
-        validate_missing_rules: (targets, deps, deps_map),
-    }
-
     for validator in TARGET_VALIDATORS:
-        args = target_args[validator]
-        is_valid = validator(*args, errors=errors) and is_valid
+        if validator is validate_target_comments:
+            is_valid = validator(targets, errors=errors) and is_valid
+        elif validator is validate_orphan_targets:
+            is_valid = validator(targets, deps, errors=errors) and is_valid
+        else:
+            is_valid = validator(targets, deps, deps_map, errors=errors) and is_valid
 
     return is_valid
 

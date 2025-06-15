@@ -70,6 +70,7 @@ def test_error_includes_line_info() -> None:
     )
     valid, errors = run_validation(mk)
     assert not valid
+    assert any(err.error_type == "trailing spaces" for err in errors)
     trailing = next(err for err in errors if err.error_type == "trailing spaces")
     assert (
         trailing.line_number is not None
@@ -82,6 +83,7 @@ def test_missing_rule_line_info() -> None:
     mk = "all: foo\n"
     valid, errors = run_validation(mk)
     assert not valid
+    assert any(e.error_type == "missing rule" for e in errors)
     err = next(e for e in errors if e.error_type == "missing rule")
     expected = next(i for i, line in enumerate(mk.splitlines()) if "all:" in line)
     assert err.line_number == expected
@@ -93,6 +95,8 @@ def test_orphan_and_no_docs_line_info() -> None:
     valid, errors = run_validation(mk)
     assert not valid
     expected = next(i for i, line in enumerate(mk.splitlines()) if line.startswith("foo"))
+    assert any(e.error_type == "orphan target" for e in errors)
+    assert any(e.error_type == "target without comments" for e in errors)
     orphan = next(e for e in errors if e.error_type == "orphan target")
     nodoc = next(e for e in errors if e.error_type == "target without comments")
     assert orphan.line_number == expected
@@ -117,7 +121,7 @@ def test_main_reports_summary(tmp_path, monkeypatch, capsys) -> None:
     captured = capsys.readouterr()
     assert ret == 1
     assert "validation failed" in captured.err.lower()
-    assert "missing rule: 1" in captured.err
+    assert "missing rule: 1" in captured.err.lower()
 
 
 def test_summary_counts_similar_errors() -> None:
