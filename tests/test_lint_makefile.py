@@ -12,14 +12,14 @@ def run_validation(mk: str) -> tuple[bool, list[lint_makefile.LintError]]:
     return valid, errors
 
 
-def test_missing_rule():
+def test_missing_rule() -> None:
     mk = "all: foo\n"
     valid, errors = run_validation(mk)
     assert not valid
     assert any(err.error_type == "missing rule" for err in errors)
 
 
-def test_spaces_after_multiline_continuation():
+def test_spaces_after_multiline_continuation() -> None:
     mk = (
         "all: foo bar \\\n"
         "    baz ## [FINAL] deploy\n"
@@ -34,14 +34,14 @@ def test_spaces_after_multiline_continuation():
     assert valid, errors
 
 
-def test_trailing_spaces_after_continuation():
+def test_trailing_spaces_after_continuation() -> None:
     mk = "all: foo \\  \n\t@echo foo\n"
     valid, errors = run_validation(mk)
     assert not valid
     assert any(err.error_type == "trailing spaces" for err in errors)
 
 
-def test_trailing_spaces():
+def test_trailing_spaces() -> None:
     mk = (
         "all: foo ## [FINAL] doc  \n"
         "\t@echo foo\n"
@@ -53,7 +53,7 @@ def test_trailing_spaces():
     assert any(err.error_type == "trailing spaces" for err in errors)
 
 
-def test_space_instead_of_tab():
+def test_space_instead_of_tab() -> None:
     mk = (
         "all: ## [FINAL] doc\n"
         "  @echo foo\n"
@@ -63,7 +63,7 @@ def test_space_instead_of_tab():
     assert any(err.error_type == "space instead of tab" for err in errors)
 
 
-def test_error_includes_line_info():
+def test_error_includes_line_info() -> None:
     mk = (
         "all: foo ## [FINAL] doc  \n"
         "\t@echo foo\n"
@@ -71,13 +71,11 @@ def test_error_includes_line_info():
     valid, errors = run_validation(mk)
     assert not valid
     trailing = next(err for err in errors if err.error_type == "trailing spaces")
-    lines = mk.splitlines()
-    expected = lines.index(next(line for line in lines if line.endswith("  ")))
-    assert trailing.line_number == expected
+    assert mk.splitlines()[trailing.line_number].endswith("  ")
     assert trailing.line_text.endswith("  ")
 
 
-def test_missing_rule_line_info():
+def test_missing_rule_line_info() -> None:
     mk = "all: foo\n"
     valid, errors = run_validation(mk)
     assert not valid
@@ -87,7 +85,7 @@ def test_missing_rule_line_info():
     assert err.line_text.startswith("all:")
 
 
-def test_orphan_and_no_docs_line_info():
+def test_orphan_and_no_docs_line_info() -> None:
     mk = "foo:\n\t@echo foo\n"
     valid, errors = run_validation(mk)
     assert not valid
@@ -98,7 +96,7 @@ def test_orphan_and_no_docs_line_info():
     assert nodoc.line_number == expected
 
 
-def test_orphan_and_no_docs():
+def test_orphan_and_no_docs() -> None:
     mk = "foo:\n\t@echo foo\n"
     valid, errors = run_validation(mk)
     assert not valid
@@ -107,7 +105,7 @@ def test_orphan_and_no_docs():
     assert "target without comments" in types
 
 
-def test_main_reports_summary(tmp_path, monkeypatch, capsys):
+def test_main_reports_summary(tmp_path, monkeypatch, capsys) -> None:
     mk = "all: foo\n"
     mfile = tmp_path / "Makefile"
     mfile.write_text(mk)
@@ -119,7 +117,7 @@ def test_main_reports_summary(tmp_path, monkeypatch, capsys):
     assert "missing rule: 1" in captured.err
 
 
-def test_summary_counts_similar_errors():
+def test_summary_counts_similar_errors() -> None:
     errors = [
         lint_makefile.LintError(error_type="space instead of tab", message=""),
         lint_makefile.LintError(error_type="space instead of tab", message=""),

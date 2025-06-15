@@ -1,13 +1,12 @@
 import argparse
+import collections
+import os
 import re
-
 import sys
+from dataclasses import dataclass
 from typing import Callable
 
 from make_profiler.parser import parse
-import collections
-import os
-from dataclasses import dataclass
 
 
 @dataclass
@@ -253,7 +252,8 @@ TARGET_VALIDATORS: list[Callable[..., bool]] = [
     validate_target_comments,
     validate_missing_rules,
 ]
-TEXT_VALIDATORS: list[Callable[[list[str]], bool]] = [validate_spaces]
+# The list holds validators with varying signatures, so use a generic Callable.
+TEXT_VALIDATORS: list[Callable[..., bool]] = [validate_spaces]
 
 
 def validate(
@@ -270,13 +270,14 @@ def validate(
     for validator in TEXT_VALIDATORS:
         is_valid = validator(makefile_lines, errors=errors) and is_valid
 
+    _target_dispatch = {
+        validate_target_comments: lambda v: v(targets, errors=errors),
+        validate_orphan_targets: lambda v: v(targets, deps, errors=errors),
+        validate_missing_rules: lambda v: v(targets, deps, deps_map, errors=errors),
+    }
+
     for validator in TARGET_VALIDATORS:
-        if validator is validate_target_comments:
-            is_valid = validator(targets, errors=errors) and is_valid
-        elif validator is validate_orphan_targets:
-            is_valid = validator(targets, deps, errors=errors) and is_valid
-        else:
-            is_valid = validator(targets, deps, deps_map, errors=errors) and is_valid
+        is_valid = _target_dispatch[validator](validator) and is_valid
 
     return is_valid
 
