@@ -72,7 +72,7 @@ def test_error_includes_line_info():
     assert not valid
     trailing = next(err for err in errors if err.error_type == "trailing spaces")
     lines = mk.splitlines()
-    expected = lines.index(next(l for l in lines if l.endswith("  ")))
+    expected = lines.index(next(line for line in lines if line.endswith("  ")))
     assert trailing.line_number == expected
     assert trailing.line_text.endswith("  ")
 

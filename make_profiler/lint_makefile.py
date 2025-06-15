@@ -74,7 +74,10 @@ def _compute_target_lines(lines: list[str]) -> dict[str, tuple[int, str]]:
                 for name in names:
                     mapping.setdefault(name, (i, line))
             while stripped.rstrip().endswith("\\"):
-                i, next_line = next(it)
+                try:
+                    i, next_line = next(it)
+                except StopIteration:
+                    return mapping
                 stripped = next_line.strip()
     return mapping
 
@@ -111,7 +114,9 @@ def parse_targets(
     return target_data, deps_targets, deps_map
 
 
-def validate_target_comments(targets: list[TargetData], *args, errors: list[LintError] | None = None) -> bool:
+def validate_target_comments(
+    targets: list[TargetData], *, errors: list[LintError] | None = None
+) -> bool:
     """Ensure that every target has documentation."""
     is_valid = True
 
@@ -133,7 +138,12 @@ def validate_target_comments(targets: list[TargetData], *args, errors: list[Lint
     return is_valid
 
 
-def validate_orphan_targets(targets: list[TargetData], deps: set[str], *args, errors: list[LintError] | None = None) -> bool:
+def validate_orphan_targets(
+    targets: list[TargetData],
+    deps: set[str],
+    *,
+    errors: list[LintError] | None = None,
+) -> bool:
     """Check that every target is used or explicitly marked as FINAL."""
     is_valid = True
 
@@ -238,12 +248,12 @@ def validate_spaces(lines: list[str], *, errors: list[LintError] | None = None) 
     return is_valid
 
 
-TARGET_VALIDATORS: Callable[[list[TargetData], set[str], dict[str, set[str]]], bool] = [
+TARGET_VALIDATORS: list[Callable[..., bool]] = [
     validate_orphan_targets,
     validate_target_comments,
     validate_missing_rules,
 ]
-TEXT_VALIDATORS: Callable[[list[str]], bool] = [validate_spaces]
+TEXT_VALIDATORS: list[Callable[[list[str]], bool]] = [validate_spaces]
 
 
 def validate(
@@ -261,7 +271,12 @@ def validate(
         is_valid = validator(makefile_lines, errors=errors) and is_valid
 
     for validator in TARGET_VALIDATORS:
-        is_valid = validator(targets, deps, deps_map, errors=errors) and is_valid
+        if validator is validate_target_comments:
+            is_valid = validator(targets, errors=errors) and is_valid
+        elif validator is validate_orphan_targets:
+            is_valid = validator(targets, deps, errors=errors) and is_valid
+        else:
+            is_valid = validator(targets, deps, deps_map, errors=errors) and is_valid
 
     return is_valid
 
