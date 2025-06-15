@@ -4,10 +4,11 @@ from make_profiler import parser, lint_makefile
 
 
 def run_validation(mk: str) -> tuple[bool, list[lint_makefile.LintError]]:
+    lines = mk.splitlines()
     ast = parser.parse(io.StringIO(mk))
-    targets, deps, dep_map = lint_makefile.parse_targets(ast, mk.splitlines())
+    targets, deps, dep_map = lint_makefile.parse_targets(ast, lines)
     errors: list[lint_makefile.LintError] = []
-    valid = lint_makefile.validate(mk.splitlines(), targets, deps, dep_map, errors=errors)
+    valid = lint_makefile.validate(lines, targets, deps, dep_map, errors=errors)
     return valid, errors
 
 
@@ -31,6 +32,13 @@ def test_spaces_after_multiline_continuation():
     )
     valid, errors = run_validation(mk)
     assert valid, errors
+
+
+def test_trailing_spaces_after_continuation():
+    mk = "all: foo \\  \n\t@echo foo\n"
+    valid, errors = run_validation(mk)
+    assert not valid
+    assert any(err.error_type == "trailing spaces" for err in errors)
 
 
 def test_trailing_spaces():
@@ -63,10 +71,9 @@ def test_error_includes_line_info():
     valid, errors = run_validation(mk)
     assert not valid
     trailing = next(err for err in errors if err.error_type == "trailing spaces")
-    expected_line = next(
-        i for i, line in enumerate(mk.splitlines()) if line.endswith("  ")
-    )
-    assert trailing.line_number == expected_line
+    lines = mk.splitlines()
+    expected = lines.index(next(l for l in lines if l.endswith("  ")))
+    assert trailing.line_number == expected
     assert trailing.line_text.endswith("  ")
 
 

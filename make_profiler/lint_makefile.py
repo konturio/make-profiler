@@ -2,7 +2,7 @@ import argparse
 import re
 
 import sys
-from typing import Callable, Dict, List, Set, Tuple
+from typing import Callable
 
 from make_profiler.parser import parse
 import collections
@@ -40,7 +40,23 @@ class TargetData:
     line_text: str | None = None
 
 
-def _compute_target_lines(lines: List[str]) -> dict[str, tuple[int, str]]:
+def _create_error(
+    error_type: str,
+    message: str,
+    line_number: int | None = None,
+    line_text: str | None = None,
+) -> LintError:
+    """Construct a LintError with consistent arguments."""
+
+    return LintError(
+        error_type=error_type,
+        message=message,
+        line_number=line_number,
+        line_text=line_text,
+    )
+
+
+def _compute_target_lines(lines: list[str]) -> dict[str, tuple[int, str]]:
     mapping: dict[str, tuple[int, str]] = {}
     it = enumerate(lines)
     for i, line in it:
@@ -54,8 +70,9 @@ def _compute_target_lines(lines: List[str]) -> dict[str, tuple[int, str]]:
         if ":" in line and "=" not in line:
             m = re.match(r"(?P<target>[^:]+):", line)
             if m:
-                name = m.group("target").strip()
-                mapping.setdefault(name, (i, line))
+                names = m.group("target").split()
+                for name in names:
+                    mapping.setdefault(name, (i, line))
             while stripped.rstrip().endswith("\\"):
                 i, next_line = next(it)
                 stripped = next_line.strip()
@@ -63,9 +80,9 @@ def _compute_target_lines(lines: List[str]) -> dict[str, tuple[int, str]]:
 
 
 def parse_targets(
-    ast: List[Tuple[str, Dict]],
-    lines: List[str] | None = None,
-) -> Tuple[List[TargetData], Set[str], Dict[str, Set[str]]]:
+    ast: list[tuple[str, dict]],
+    lines: list[str] | None = None,
+) -> tuple[list[TargetData], set[str], dict[str, set[str]]]:
     line_map = _compute_target_lines(lines) if lines else {}
     target_data = []
     deps_targets = set()
@@ -94,7 +111,7 @@ def parse_targets(
     return target_data, deps_targets, deps_map
 
 
-def validate_target_comments(targets: List[TargetData], *args, errors: List[LintError] | None = None) -> bool:
+def validate_target_comments(targets: list[TargetData], *args, errors: list[LintError] | None = None) -> bool:
     """Ensure that every target has documentation."""
     is_valid = True
 
@@ -104,9 +121,9 @@ def validate_target_comments(targets: List[TargetData], *args, errors: List[Lint
             print(msg, file=sys.stderr)
             if errors is not None:
                 errors.append(
-                    LintError(
-                        error_type="target without comments",
-                        message=msg,
+                    _create_error(
+                        "target without comments",
+                        msg,
                         line_number=t.line_number,
                         line_text=t.line_text,
                     ),
@@ -116,7 +133,7 @@ def validate_target_comments(targets: List[TargetData], *args, errors: List[Lint
     return is_valid
 
 
-def validate_orphan_targets(targets: List[TargetData], deps: Set[str], *args, errors: List[LintError] | None = None) -> bool:
+def validate_orphan_targets(targets: list[TargetData], deps: set[str], *args, errors: list[LintError] | None = None) -> bool:
     """Check that every target is used or explicitly marked as FINAL."""
     is_valid = True
 
@@ -126,9 +143,9 @@ def validate_orphan_targets(targets: List[TargetData], deps: Set[str], *args, er
             print(msg, file=sys.stderr)
             if errors is not None:
                 errors.append(
-                    LintError(
-                        error_type="orphan target",
-                        message=msg,
+                    _create_error(
+                        "orphan target",
+                        msg,
                         line_number=t.line_number,
                         line_text=t.line_text,
                     ),
@@ -139,11 +156,11 @@ def validate_orphan_targets(targets: List[TargetData], deps: Set[str], *args, er
 
 
 def validate_missing_rules(
-    targets: List[TargetData],
-    deps: Set[str],
-    deps_map: Dict[str, Set[str]],
+    targets: list[TargetData],
+    deps: set[str],
+    deps_map: dict[str, set[str]],
     *,
-    errors: List[LintError] | None = None,
+    errors: list[LintError] | None = None,
 ) -> bool:
     """Report dependencies that do not have a rule or a file backing them."""
     is_valid = True
@@ -158,9 +175,9 @@ def validate_missing_rules(
                 if errors is not None:
                     t = target_map.get(parent)
                     errors.append(
-                        LintError(
-                            error_type="missing rule",
-                            message=msg,
+                        _create_error(
+                            "missing rule",
+                            msg,
                             line_number=t.line_number if t else None,
                             line_text=t.line_text if t else None,
                         ),
@@ -170,7 +187,7 @@ def validate_missing_rules(
     return is_valid
 
 
-def validate_spaces(lines: List[str], *, errors: List[LintError] | None = None) -> bool:
+def validate_spaces(lines: list[str], *, errors: list[LintError] | None = None) -> bool:
     """Validate that there are no unwanted spaces in Makefile lines.
 
     Spaces at the beginning of a line are normally disallowed.  However
@@ -184,47 +201,32 @@ def validate_spaces(lines: List[str], *, errors: List[LintError] | None = None) 
     prev_line = ""
 
     for i, line in enumerate(lines):
-        # Skip the check for leading spaces if the previous line ends with
-        # a continuation character.  Trailing spaces are still reported.
-        if prev_line.rstrip().endswith("\\"):
-            prev_line = line
-            if line.rstrip() != line:
-                msg = f"Trailing spaces ({i}): {line}"
-                print(msg, file=sys.stderr)
-                if errors is not None:
-                    errors.append(
-                        LintError(
-                            error_type="trailing spaces",
-                            message=msg,
-                            line_number=i,
-                            line_text=line,
-                        ),
-                    )
-                is_valid = False
-            continue
-
         if line.rstrip() != line:
             msg = f"Trailing spaces ({i}): {line}"
             print(msg, file=sys.stderr)
             if errors is not None:
                 errors.append(
-                    LintError(
-                        error_type="trailing spaces",
-                        message=msg,
+                    _create_error(
+                        "trailing spaces",
+                        msg,
                         line_number=i,
                         line_text=line,
                     ),
                 )
             is_valid = False
 
+        if prev_line.rstrip().endswith("\\"):
+            prev_line = line
+            continue
+
         if line.startswith(" ") and not line.startswith("\t"):
             msg = f"Space instead of tab ({i}): {line}"
             print(msg, file=sys.stderr)
             if errors is not None:
                 errors.append(
-                    LintError(
-                        error_type="space instead of tab",
-                        message=msg,
+                    _create_error(
+                        "space instead of tab",
+                        msg,
                         line_number=i,
                         line_text=line,
                     ),
@@ -236,21 +238,21 @@ def validate_spaces(lines: List[str], *, errors: List[LintError] | None = None) 
     return is_valid
 
 
-TARGET_VALIDATORS: Callable[[List[TargetData], Set[str], Dict[str, Set[str]]], bool] = [
+TARGET_VALIDATORS: Callable[[list[TargetData], set[str], dict[str, set[str]]], bool] = [
     validate_orphan_targets,
     validate_target_comments,
     validate_missing_rules,
 ]
-TEXT_VALIDATORS: Callable[[List[str]], bool] = [validate_spaces]
+TEXT_VALIDATORS: Callable[[list[str]], bool] = [validate_spaces]
 
 
 def validate(
-    makefile_lines: List[str],
-    targets: List[TargetData],
-    deps: Set[str],
-    deps_map: Dict[str, Set[str]],
+    makefile_lines: list[str],
+    targets: list[TargetData],
+    deps: set[str],
+    deps_map: dict[str, set[str]],
     *,
-    errors: List[LintError] | None = None,
+    errors: list[LintError] | None = None,
 ) -> bool:
     """Run all validators and collect error messages."""
     is_valid = True
@@ -264,7 +266,7 @@ def validate(
     return is_valid
 
 
-def summarize_errors(errors: List[LintError]) -> str:
+def summarize_errors(errors: list[LintError]) -> str:
     """Return a short summary of lint errors."""
 
     counts = collections.Counter(err.error_type for err in errors)
@@ -295,7 +297,7 @@ def main():
 
     targets, deps, deps_map = parse_targets(ast, makefile_lines)
 
-    errors: List[LintError] = []
+    errors: list[LintError] = []
     if not validate(makefile_lines, targets, deps, deps_map, errors=errors):
         summary = summarize_errors(errors)
         print(f"Makefile validation failed: {summary}", file=sys.stderr)
