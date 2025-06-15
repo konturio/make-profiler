@@ -71,6 +71,9 @@ def test_error_includes_line_info() -> None:
     valid, errors = run_validation(mk)
     assert not valid
     trailing = next(err for err in errors if err.error_type == "trailing spaces")
+    assert (
+        trailing.line_number is not None
+    ), "line_number should be present for trailing space errors"
     assert mk.splitlines()[trailing.line_number].endswith("  ")
     assert trailing.line_text.endswith("  ")
 

@@ -1,3 +1,6 @@
 more_itertools
 graphviz~=0.20
+# developer tools for style checks
+pylint
+ruff
 # pinned for stability

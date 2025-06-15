@@ -57,15 +57,23 @@ def _create_error(
 
 def _compute_target_lines(lines: list[str]) -> dict[str, tuple[int, str]]:
     mapping: dict[str, tuple[int, str]] = {}
-    it = enumerate(lines)
-    for i, line in it:
+    i = 0
+    n = len(lines)
+
+    while i < n:
+        line = lines[i]
         stripped = line.strip()
+
         if not stripped:
+            i += 1
             continue
         if stripped[0] == "#" and not line.startswith("##"):
+            i += 1
             continue
         if line.startswith("\t"):
+            i += 1
             continue
+
         if ":" in line and "=" not in line:
             m = re.match(r"(?P<target>[^:]+):", line)
             if m:
@@ -73,11 +81,16 @@ def _compute_target_lines(lines: list[str]) -> dict[str, tuple[int, str]]:
                 for name in names:
                     mapping.setdefault(name, (i, line))
             while stripped.rstrip().endswith("\\"):
-                try:
-                    i, next_line = next(it)
-                except StopIteration:
+                i += 1
+                if i >= n:
                     return mapping
-                stripped = next_line.strip()
+                line = lines[i]
+                stripped = line.strip()
+            i += 1
+            continue
+
+        i += 1
+
     return mapping
 
 
@@ -270,14 +283,15 @@ def validate(
     for validator in TEXT_VALIDATORS:
         is_valid = validator(makefile_lines, errors=errors) and is_valid
 
-    _target_dispatch = {
-        validate_target_comments: lambda v: v(targets, errors=errors),
-        validate_orphan_targets: lambda v: v(targets, deps, errors=errors),
-        validate_missing_rules: lambda v: v(targets, deps, deps_map, errors=errors),
+    target_args = {
+        validate_target_comments: (targets,),
+        validate_orphan_targets: (targets, deps),
+        validate_missing_rules: (targets, deps, deps_map),
     }
 
     for validator in TARGET_VALIDATORS:
-        is_valid = _target_dispatch[validator](validator) and is_valid
+        args = target_args[validator]
+        is_valid = validator(*args, errors=errors) and is_valid
 
     return is_valid
 
