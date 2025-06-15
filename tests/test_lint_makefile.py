@@ -3,7 +3,7 @@ import pytest
 from make_profiler import parser, lint_makefile
 
 
-def run_validation(mk: str):
+def run_validation(mk: str) -> tuple[bool, list[lint_makefile.LintError]]:
     ast = parser.parse(io.StringIO(mk))
     targets, deps, dep_map = lint_makefile.parse_targets(ast)
     errors: list[lint_makefile.LintError] = []
@@ -63,7 +63,10 @@ def test_error_includes_line_info():
     valid, errors = run_validation(mk)
     assert not valid
     trailing = next(err for err in errors if err.type == "trailing spaces")
-    assert trailing.line_number == 0
+    expected_line = next(
+        i for i, line in enumerate(mk.split("\n")) if line.endswith("  ")
+    )
+    assert trailing.line_number == expected_line
     assert trailing.line_text.endswith("  ")
 
 

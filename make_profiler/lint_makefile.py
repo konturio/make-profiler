@@ -139,7 +139,7 @@ def validate_spaces(lines: List[str], *, errors: List[LintError] | None = None) 
                             message=msg,
                             line_number=i,
                             line_text=line,
-                        )
+                        ),
                     )
                 is_valid = False
             continue
@@ -154,7 +154,7 @@ def validate_spaces(lines: List[str], *, errors: List[LintError] | None = None) 
                         message=msg,
                         line_number=i,
                         line_text=line,
-                    )
+                    ),
                 )
             is_valid = False
 
@@ -168,7 +168,7 @@ def validate_spaces(lines: List[str], *, errors: List[LintError] | None = None) 
                         message=msg,
                         line_number=i,
                         line_text=line,
-                    )
+                    ),
                 )
             is_valid = False
 
