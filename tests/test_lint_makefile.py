@@ -31,6 +31,34 @@ def test_spaces_after_multiline_continuation(capsys):
     assert valid, captured.out
 
 
+def test_trailing_spaces(capsys):
+    mk = (
+        "all: foo ## [FINAL] doc  \n"
+        "\t@echo foo\n"
+        "foo: ## doc\n"
+        "\t@echo bar\n"
+    )
+    ast = parser.parse(io.StringIO(mk))
+    targets, deps, dep_map = lint_makefile.parse_targets(ast)
+    valid = lint_makefile.validate(mk.split('\n'), targets, deps, dep_map)
+    captured = capsys.readouterr()
+    assert not valid
+    assert "Trailing spaces" in captured.out
+
+
+def test_space_instead_of_tab(capsys):
+    mk = (
+        "all: ## [FINAL] doc\n"
+        "  @echo foo\n"
+    )
+    ast = parser.parse(io.StringIO(mk))
+    targets, deps, dep_map = lint_makefile.parse_targets(ast)
+    valid = lint_makefile.validate(mk.split('\n'), targets, deps, dep_map)
+    captured = capsys.readouterr()
+    assert not valid
+    assert "Space instead of tab" in captured.out
+
+
 def test_main_reports_summary(tmp_path, monkeypatch, capsys):
     mk = "all: foo\n"
     mfile = tmp_path / "Makefile"

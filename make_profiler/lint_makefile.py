@@ -120,15 +120,22 @@ def validate_spaces(lines: List[str], *, errors: List[str] | None = None) -> boo
         if prev_line.rstrip().endswith("\\"):
             prev_line = line
             if line.rstrip() != line:
-                msg = f"Line with extra spaces ({i}): {line}"
+                msg = f"Trailing spaces ({i}): {line}"
                 print(msg)
                 if errors is not None:
                     errors.append(msg)
                 is_valid = False
             continue
 
-        if line.rstrip() != line or (line.startswith(" ") and not line.startswith("\t")):
-            msg = f"Line with extra spaces ({i}): {line}"
+        if line.rstrip() != line:
+            msg = f"Trailing spaces ({i}): {line}"
+            print(msg)
+            if errors is not None:
+                errors.append(msg)
+            is_valid = False
+
+        if line.startswith(" ") and not line.startswith("\t"):
+            msg = f"Space instead of tab ({i}): {line}"
             print(msg)
             if errors is not None:
                 errors.append(msg)
