@@ -10,13 +10,13 @@ def parse_timing_db(filename, after_date=None):
     lines.reverse()
     cur_run_bid = ''
     targets = dict()
-    for l in lines:
-        if len(l) != 4:
+    for parts in lines:
+        if len(parts) != 4:
             continue
-        target = l[3]
-        bid = l[1]
-        action = l[2]
-        timestamp = float(l[0])
+        target = parts[3]
+        bid = parts[1]
+        action = parts[2]
+        timestamp = float(parts[0])
 
         if not cur_run_bid:
             cur_run_bid = bid

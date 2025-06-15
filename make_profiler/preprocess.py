@@ -51,7 +51,7 @@ HOOKS = {
 
 def generate_makefile(ast, fd, db_filename):
     def clean(value):
-        if type(value) is list:
+        if isinstance(value, list):
             return '\n'.join(value)
         return ' '.join(map(str.strip, value.split('\n')))
 
