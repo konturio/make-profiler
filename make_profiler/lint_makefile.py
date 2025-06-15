@@ -36,9 +36,37 @@ def parse_args():
 class TargetData:
     name: str
     doc: str
+    line_number: int | None = None
+    line_text: str | None = None
 
 
-def parse_targets(ast: List[Tuple[str, Dict]]) -> Tuple[List[TargetData], Set[str], Dict[str, Set[str]]]:
+def _compute_target_lines(lines: List[str]) -> dict[str, tuple[int, str]]:
+    mapping: dict[str, tuple[int, str]] = {}
+    it = enumerate(lines)
+    for i, line in it:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if stripped[0] == "#" and not line.startswith("##"):
+            continue
+        if line.startswith("\t"):
+            continue
+        if ":" in line and "=" not in line:
+            m = re.match(r"(?P<target>[^:]+):", line)
+            if m:
+                name = m.group("target").strip()
+                mapping.setdefault(name, (i, line))
+            while stripped.rstrip().endswith("\\"):
+                i, next_line = next(it)
+                stripped = next_line.strip()
+    return mapping
+
+
+def parse_targets(
+    ast: List[Tuple[str, Dict]],
+    lines: List[str] | None = None,
+) -> Tuple[List[TargetData], Set[str], Dict[str, Set[str]]]:
+    line_map = _compute_target_lines(lines) if lines else {}
     target_data = []
     deps_targets = set()
     deps_map = collections.defaultdict(set)
@@ -48,7 +76,15 @@ def parse_targets(ast: List[Tuple[str, Dict]]) -> Tuple[List[TargetData], Set[st
             continue
 
         name = data["target"]
-        target_data.append(TargetData(name=name, doc=data["docs"]))
+        line_number, line_text = line_map.get(name, (None, None))
+        target_data.append(
+            TargetData(
+                name=name,
+                doc=data["docs"],
+                line_number=line_number,
+                line_text=line_text,
+            )
+        )
 
         for dep_arr in data["deps"]:
             for item in dep_arr:
@@ -68,7 +104,12 @@ def validate_target_comments(targets: List[TargetData], *args, errors: List[Lint
             print(msg, file=sys.stderr)
             if errors is not None:
                 errors.append(
-                    LintError(error_type="target without comments", message=msg),
+                    LintError(
+                        error_type="target without comments",
+                        message=msg,
+                        line_number=t.line_number,
+                        line_text=t.line_text,
+                    ),
                 )
             is_valid = False
 
@@ -85,7 +126,12 @@ def validate_orphan_targets(targets: List[TargetData], deps: Set[str], *args, er
             print(msg, file=sys.stderr)
             if errors is not None:
                 errors.append(
-                    LintError(error_type="orphan target", message=msg),
+                    LintError(
+                        error_type="orphan target",
+                        message=msg,
+                        line_number=t.line_number,
+                        line_text=t.line_text,
+                    ),
                 )
             is_valid = False
 
@@ -102,15 +148,22 @@ def validate_missing_rules(
     """Report dependencies that do not have a rule or a file backing them."""
     is_valid = True
 
-    target_names = {t.name for t in targets}
+    target_map = {t.name: t for t in targets}
+    target_names = set(target_map)
     for dep in deps:
         if dep not in target_names and not os.path.exists(dep):
             for parent in sorted(deps_map.get(dep, [])):
                 msg = f"No rule to make target '{dep}', needed by '{parent}'"
                 print(msg, file=sys.stderr)
                 if errors is not None:
+                    t = target_map.get(parent)
                     errors.append(
-                        LintError(error_type="missing rule", message=msg),
+                        LintError(
+                            error_type="missing rule",
+                            message=msg,
+                            line_number=t.line_number if t else None,
+                            line_text=t.line_text if t else None,
+                        ),
                     )
             is_valid = False
 
@@ -240,7 +293,7 @@ def main():
     with open(args.in_filename, "r") as file:
         ast = parse(file)
 
-    targets, deps, deps_map = parse_targets(ast)
+    targets, deps, deps_map = parse_targets(ast, makefile_lines)
 
     errors: List[LintError] = []
     if not validate(makefile_lines, targets, deps, deps_map, errors=errors):

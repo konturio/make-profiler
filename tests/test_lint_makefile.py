@@ -5,7 +5,7 @@ from make_profiler import parser, lint_makefile
 
 def run_validation(mk: str) -> tuple[bool, list[lint_makefile.LintError]]:
     ast = parser.parse(io.StringIO(mk))
-    targets, deps, dep_map = lint_makefile.parse_targets(ast)
+    targets, deps, dep_map = lint_makefile.parse_targets(ast, mk.splitlines())
     errors: list[lint_makefile.LintError] = []
     valid = lint_makefile.validate(mk.splitlines(), targets, deps, dep_map, errors=errors)
     return valid, errors
@@ -68,6 +68,27 @@ def test_error_includes_line_info():
     )
     assert trailing.line_number == expected_line
     assert trailing.line_text.endswith("  ")
+
+
+def test_missing_rule_line_info():
+    mk = "all: foo\n"
+    valid, errors = run_validation(mk)
+    assert not valid
+    err = next(e for e in errors if e.error_type == "missing rule")
+    expected = next(i for i, line in enumerate(mk.splitlines()) if "all:" in line)
+    assert err.line_number == expected
+    assert err.line_text.startswith("all:")
+
+
+def test_orphan_and_no_docs_line_info():
+    mk = "foo:\n\t@echo foo\n"
+    valid, errors = run_validation(mk)
+    assert not valid
+    expected = next(i for i, line in enumerate(mk.splitlines()) if line.startswith("foo"))
+    orphan = next(e for e in errors if e.error_type == "orphan target")
+    nodoc = next(e for e in errors if e.error_type == "target without comments")
+    assert orphan.line_number == expected
+    assert nodoc.line_number == expected
 
 
 def test_orphan_and_no_docs():
