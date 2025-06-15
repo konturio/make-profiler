@@ -1,7 +1,6 @@
 import collections
 import re
 import tempfile
-import sys
 
 from enum import Enum
 from typing import Any, Dict, Generator, List, Tuple, TextIO, Pattern
@@ -64,7 +63,10 @@ def parse(fd: TextIO, is_check_loop: bool = True, loop_check_depth: int = 20) ->
                 return False
 
         # create nested function to be able insert included makes recursively
-        def replace_include_with_file(input_make: str, regular_expression: Pattern[str]) -> str:
+        def replace_include_with_file(
+            input_make: str, regular_expression: Pattern[str]
+        ) -> str:
+            output_make = input_make
             # create list of rows from input make
             list_of_rows = input_make.split('\n')
             # iterate through input makefile
@@ -86,8 +88,10 @@ def parse(fd: TextIO, is_check_loop: bool = True, loop_check_depth: int = 20) ->
                     # transform list into single string
                     included_string = '\n'.join(included_instructions)
         
-                    # replace include with included instruction 
-                    output_make = input_make.replace(list_of_rows[x], included_string, 1)
+                    # replace include with included instruction
+                    output_make = input_make.replace(
+                        list_of_rows[x], included_string, 1
+                    )
 
             return output_make
 

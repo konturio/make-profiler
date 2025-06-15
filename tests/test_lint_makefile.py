@@ -3,17 +3,23 @@ import pytest
 from make_profiler import parser, lint_makefile
 
 
-def test_missing_rule(capsys):
-    mk = "all: foo\n"
+def run_validation(mk: str) -> tuple[bool, list[lint_makefile.LintError]]:
+    lines = mk.splitlines()
     ast = parser.parse(io.StringIO(mk))
-    targets, deps, dep_map = lint_makefile.parse_targets(ast)
-    valid = lint_makefile.validate(mk.split('\n'), targets, deps, dep_map)
-    captured = capsys.readouterr()
+    targets, deps, dep_map = lint_makefile.parse_targets(ast, lines)
+    errors: list[lint_makefile.LintError] = []
+    valid = lint_makefile.validate(lines, targets, deps, dep_map, errors=errors)
+    return valid, errors
+
+
+def test_missing_rule() -> None:
+    mk = "all: foo\n"
+    valid, errors = run_validation(mk)
     assert not valid
-    assert "No rule to make target 'foo', needed by 'all'" in captured.out
+    assert any(err.error_type == "missing rule" for err in errors)
 
 
-def test_spaces_after_multiline_continuation(capsys):
+def test_spaces_after_multiline_continuation() -> None:
     mk = (
         "all: foo bar \\\n"
         "    baz ## [FINAL] deploy\n"
@@ -24,42 +30,89 @@ def test_spaces_after_multiline_continuation(capsys):
         "baz: ## third dep\n"
         "\t@echo baz\n"
     )
-    ast = parser.parse(io.StringIO(mk))
-    targets, deps, dep_map = lint_makefile.parse_targets(ast)
-    valid = lint_makefile.validate(mk.split('\n'), targets, deps, dep_map)
-    captured = capsys.readouterr()
-    assert valid, captured.out
+    valid, errors = run_validation(mk)
+    assert valid, errors
 
 
-def test_trailing_spaces(capsys):
+def test_trailing_spaces_after_continuation() -> None:
+    mk = "all: foo \\  \n\t@echo foo\n"
+    valid, errors = run_validation(mk)
+    assert not valid
+    assert any(err.error_type == "trailing spaces" for err in errors)
+
+
+def test_trailing_spaces() -> None:
     mk = (
         "all: foo ## [FINAL] doc  \n"
         "\t@echo foo\n"
         "foo: ## doc\n"
         "\t@echo bar\n"
     )
-    ast = parser.parse(io.StringIO(mk))
-    targets, deps, dep_map = lint_makefile.parse_targets(ast)
-    valid = lint_makefile.validate(mk.split('\n'), targets, deps, dep_map)
-    captured = capsys.readouterr()
+    valid, errors = run_validation(mk)
     assert not valid
-    assert "Trailing spaces" in captured.out
+    assert any(err.error_type == "trailing spaces" for err in errors)
 
 
-def test_space_instead_of_tab(capsys):
+def test_space_instead_of_tab() -> None:
     mk = (
         "all: ## [FINAL] doc\n"
         "  @echo foo\n"
     )
-    ast = parser.parse(io.StringIO(mk))
-    targets, deps, dep_map = lint_makefile.parse_targets(ast)
-    valid = lint_makefile.validate(mk.split('\n'), targets, deps, dep_map)
-    captured = capsys.readouterr()
+    valid, errors = run_validation(mk)
     assert not valid
-    assert "Space instead of tab" in captured.out
+    assert any(err.error_type == "space instead of tab" for err in errors)
 
 
-def test_main_reports_summary(tmp_path, monkeypatch, capsys):
+def test_error_includes_line_info() -> None:
+    mk = (
+        "all: foo ## [FINAL] doc  \n"
+        "\t@echo foo\n"
+    )
+    valid, errors = run_validation(mk)
+    assert not valid
+    assert any(err.error_type == "trailing spaces" for err in errors)
+    trailing = next(err for err in errors if err.error_type == "trailing spaces")
+    assert (
+        trailing.line_number is not None
+    ), "line_number should be present for trailing space errors"
+    assert mk.splitlines()[trailing.line_number].endswith("  ")
+    assert trailing.line_text.endswith("  ")
+
+
+def test_missing_rule_line_info() -> None:
+    mk = "all: foo\n"
+    valid, errors = run_validation(mk)
+    assert not valid
+    assert any(e.error_type == "missing rule" for e in errors)
+    err = next(e for e in errors if e.error_type == "missing rule")
+    expected = next(i for i, line in enumerate(mk.splitlines()) if "all:" in line)
+    assert err.line_number == expected
+    assert err.line_text.startswith("all:")
+
+
+def test_orphan_and_no_docs_line_info() -> None:
+    mk = "foo:\n\t@echo foo\n"
+    valid, errors = run_validation(mk)
+    assert not valid
+    expected = next(i for i, line in enumerate(mk.splitlines()) if line.startswith("foo"))
+    assert any(e.error_type == "orphan target" for e in errors)
+    assert any(e.error_type == "target without comments" for e in errors)
+    orphan = next(e for e in errors if e.error_type == "orphan target")
+    nodoc = next(e for e in errors if e.error_type == "target without comments")
+    assert orphan.line_number == expected
+    assert nodoc.line_number == expected
+
+
+def test_orphan_and_no_docs() -> None:
+    mk = "foo:\n\t@echo foo\n"
+    valid, errors = run_validation(mk)
+    assert not valid
+    types = {e.error_type for e in errors}
+    assert "orphan target" in types
+    assert "target without comments" in types
+
+
+def test_main_reports_summary(tmp_path, monkeypatch, capsys) -> None:
     mk = "all: foo\n"
     mfile = tmp_path / "Makefile"
     mfile.write_text(mk)
@@ -68,6 +121,18 @@ def test_main_reports_summary(tmp_path, monkeypatch, capsys):
     captured = capsys.readouterr()
     assert ret == 1
     assert "validation failed" in captured.err.lower()
-    assert "no rule to make target 'foo', needed by 'all'" in captured.err
+    assert "missing rule: 1" in captured.err.lower()
+
+
+def test_summary_counts_similar_errors() -> None:
+    errors = [
+        lint_makefile.LintError(error_type="space instead of tab", message=""),
+        lint_makefile.LintError(error_type="space instead of tab", message=""),
+        lint_makefile.LintError(error_type="space instead of tab", message=""),
+        lint_makefile.LintError(error_type="missing rule", message=""),
+    ]
+    summary = lint_makefile.summarize_errors(errors)
+    assert "space instead of tab: 3" in summary
+    assert "missing rule: 1" in summary
 
 

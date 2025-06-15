@@ -1,3 +1,2 @@
 more_itertools
 graphviz~=0.20
-# pinned for stability

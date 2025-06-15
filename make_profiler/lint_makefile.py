@@ -1,13 +1,22 @@
 import argparse
-import re
-
-import sys
-from typing import Callable, Dict, List, Set, Tuple
-
-from make_profiler.parser import parse
 import collections
 import os
+import re
+import sys
 from dataclasses import dataclass
+from typing import Callable
+
+from make_profiler.parser import parse
+
+
+@dataclass
+class LintError:
+    """A machine-readable lint error with useful context."""
+
+    error_type: str
+    message: str
+    line_number: int | None = None
+    line_text: str | None = None
 
 
 def parse_args():
@@ -26,9 +35,71 @@ def parse_args():
 class TargetData:
     name: str
     doc: str
+    line_number: int | None = None
+    line_text: str | None = None
 
 
-def parse_targets(ast: List[Tuple[str, Dict]]) -> Tuple[List[TargetData], Set[str], Dict[str, Set[str]]]:
+def _create_error(
+    error_type: str,
+    message: str,
+    line_number: int | None = None,
+    line_text: str | None = None,
+) -> LintError:
+    """Construct a LintError with consistent arguments."""
+
+    return LintError(
+        error_type=error_type,
+        message=message,
+        line_number=line_number,
+        line_text=line_text,
+    )
+
+
+def _compute_target_lines(lines: list[str]) -> dict[str, tuple[int, str]]:
+    mapping: dict[str, tuple[int, str]] = {}
+    i = 0
+    n = len(lines)
+    target_re = re.compile(r"(?P<target>[^:]+):")
+
+    while i < n:
+        line = lines[i]
+        stripped = line.strip()
+
+        if not stripped:
+            i += 1
+            continue
+        if stripped[0] == "#" and not line.startswith("##"):
+            i += 1
+            continue
+        if line.startswith("\t"):
+            i += 1
+            continue
+
+        if ":" in line and "=" not in line:
+            m = target_re.match(line)
+            if m:
+                names = m.group("target").split()
+                for name in names:
+                    mapping.setdefault(name, (i, line))
+            while stripped.rstrip().endswith("\\"):
+                i += 1
+                if i >= n:
+                    return mapping
+                line = lines[i]
+                stripped = line.strip()
+            i += 1
+            continue
+
+        i += 1
+
+    return mapping
+
+
+def parse_targets(
+    ast: list[tuple[str, dict]],
+    lines: list[str] | None = None,
+) -> tuple[list[TargetData], set[str], dict[str, set[str]]]:
+    line_map = _compute_target_lines(lines) if lines else {}
     target_data = []
     deps_targets = set()
     deps_map = collections.defaultdict(set)
@@ -38,7 +109,15 @@ def parse_targets(ast: List[Tuple[str, Dict]]) -> Tuple[List[TargetData], Set[st
             continue
 
         name = data["target"]
-        target_data.append(TargetData(name=name, doc=data["docs"]))
+        line_number, line_text = line_map.get(name, (None, None))
+        target_data.append(
+            TargetData(
+                name=name,
+                doc=data["docs"],
+                line_number=line_number,
+                line_text=line_text,
+            )
+        )
 
         for dep_arr in data["deps"]:
             for item in dep_arr:
@@ -48,60 +127,90 @@ def parse_targets(ast: List[Tuple[str, Dict]]) -> Tuple[List[TargetData], Set[st
     return target_data, deps_targets, deps_map
 
 
-def validate_target_comments(targets: List[TargetData], *args, errors: List[str] | None = None) -> bool:
+def validate_target_comments(
+    targets: list[TargetData], *, errors: list[LintError] | None = None
+) -> bool:
     """Ensure that every target has documentation."""
     is_valid = True
 
     for t in targets:
         if not t.doc:
             msg = f"Target without comments: {t.name}"
-            print(msg)
+            print(msg, file=sys.stderr)
             if errors is not None:
-                errors.append(msg)
+                errors.append(
+                    _create_error(
+                        "target without comments",
+                        msg,
+                        line_number=t.line_number,
+                        line_text=t.line_text,
+                    ),
+                )
             is_valid = False
 
     return is_valid
 
 
-def validate_orphan_targets(targets: List[TargetData], deps: Set[str], *args, errors: List[str] | None = None) -> bool:
+def validate_orphan_targets(
+    targets: list[TargetData],
+    deps: set[str],
+    *,
+    errors: list[LintError] | None = None,
+) -> bool:
     """Check that every target is used or explicitly marked as FINAL."""
     is_valid = True
 
     for t in targets:
         if t.name not in deps and "[FINAL]" not in t.doc:
             msg = f"{t.name}, is orphan - not marked as [FINAL] and no other target depends on it"
-            print(msg)
+            print(msg, file=sys.stderr)
             if errors is not None:
-                errors.append(msg)
+                errors.append(
+                    _create_error(
+                        "orphan target",
+                        msg,
+                        line_number=t.line_number,
+                        line_text=t.line_text,
+                    ),
+                )
             is_valid = False
 
     return is_valid
 
 
 def validate_missing_rules(
-    targets: List[TargetData],
-    deps: Set[str],
-    deps_map: Dict[str, Set[str]],
+    targets: list[TargetData],
+    deps: set[str],
+    deps_map: dict[str, set[str]],
     *,
-    errors: List[str] | None = None,
+    errors: list[LintError] | None = None,
 ) -> bool:
     """Report dependencies that do not have a rule or a file backing them."""
     is_valid = True
 
-    target_names = {t.name for t in targets}
+    target_map = {t.name: t for t in targets}
+    target_names = set(target_map)
     for dep in deps:
         if dep not in target_names and not os.path.exists(dep):
             for parent in sorted(deps_map.get(dep, [])):
                 msg = f"No rule to make target '{dep}', needed by '{parent}'"
-                print(msg)
+                print(msg, file=sys.stderr)
                 if errors is not None:
-                    errors.append(msg)
+                    t = target_map.get(parent)
+                    errors.append(
+                        _create_error(
+                            "missing rule",
+                            msg,
+                            line_number=t.line_number if t else None,
+                            line_text=t.line_text if t else None,
+                        ),
+                    )
             is_valid = False
 
     return is_valid
 
 
-def validate_spaces(lines: List[str], *, errors: List[str] | None = None) -> bool:
+def validate_spaces(lines: list[str], *, errors: list[LintError] | None = None) -> bool:
     """Validate that there are no unwanted spaces in Makefile lines.
 
     Spaces at the beginning of a line are normally disallowed.  However
@@ -115,30 +224,36 @@ def validate_spaces(lines: List[str], *, errors: List[str] | None = None) -> boo
     prev_line = ""
 
     for i, line in enumerate(lines):
-        # Skip the check for leading spaces if the previous line ends with
-        # a continuation character.  Trailing spaces are still reported.
-        if prev_line.rstrip().endswith("\\"):
-            prev_line = line
-            if line.rstrip() != line:
-                msg = f"Trailing spaces ({i}): {line}"
-                print(msg)
-                if errors is not None:
-                    errors.append(msg)
-                is_valid = False
-            continue
-
         if line.rstrip() != line:
             msg = f"Trailing spaces ({i}): {line}"
-            print(msg)
+            print(msg, file=sys.stderr)
             if errors is not None:
-                errors.append(msg)
+                errors.append(
+                    _create_error(
+                        "trailing spaces",
+                        msg,
+                        line_number=i,
+                        line_text=line,
+                    ),
+                )
             is_valid = False
+
+        if prev_line.rstrip().endswith("\\"):
+            prev_line = line
+            continue
 
         if line.startswith(" ") and not line.startswith("\t"):
             msg = f"Space instead of tab ({i}): {line}"
-            print(msg)
+            print(msg, file=sys.stderr)
             if errors is not None:
-                errors.append(msg)
+                errors.append(
+                    _create_error(
+                        "space instead of tab",
+                        msg,
+                        line_number=i,
+                        line_text=line,
+                    ),
+                )
             is_valid = False
 
         prev_line = line
@@ -146,21 +261,22 @@ def validate_spaces(lines: List[str], *, errors: List[str] | None = None) -> boo
     return is_valid
 
 
-TARGET_VALIDATORS: Callable[[List[TargetData], Set[str], Dict[str, Set[str]]], bool] = [
+TARGET_VALIDATORS: list[Callable[..., bool]] = [
     validate_orphan_targets,
     validate_target_comments,
     validate_missing_rules,
 ]
-TEXT_VALIDATORS: Callable[[List[str]], bool] = [validate_spaces]
+# The list holds validators with varying signatures, so use a generic Callable.
+TEXT_VALIDATORS: list[Callable[..., bool]] = [validate_spaces]
 
 
 def validate(
-    makefile_lines: List[str],
-    targets: List[TargetData],
-    deps: Set[str],
-    deps_map: Dict[str, Set[str]],
+    makefile_lines: list[str],
+    targets: list[TargetData],
+    deps: set[str],
+    deps_map: dict[str, set[str]],
     *,
-    errors: List[str] | None = None,
+    errors: list[LintError] | None = None,
 ) -> bool:
     """Run all validators and collect error messages."""
     is_valid = True
@@ -169,9 +285,32 @@ def validate(
         is_valid = validator(makefile_lines, errors=errors) and is_valid
 
     for validator in TARGET_VALIDATORS:
-        is_valid = validator(targets, deps, deps_map, errors=errors) and is_valid
+        if validator is validate_target_comments:
+            is_valid = validator(targets, errors=errors) and is_valid
+        elif validator is validate_orphan_targets:
+            is_valid = validator(targets, deps, errors=errors) and is_valid
+        else:
+            is_valid = validator(targets, deps, deps_map, errors=errors) and is_valid
 
     return is_valid
+
+
+def summarize_errors(errors: list[LintError]) -> str:
+    """Return a short summary of lint errors."""
+
+    counts = collections.Counter(err.error_type for err in errors)
+    first_seen: dict[str, int] = {}
+    for err in errors:
+        if err.error_type not in first_seen and err.line_number is not None:
+            first_seen[err.error_type] = err.line_number
+
+    def order(key: str) -> int:
+        return first_seen.get(key, sys.maxsize)
+
+    parts = [
+        f"{name}: {counts[name]}" for name in sorted(counts.keys(), key=order)
+    ]
+    return ", ".join(parts)
 
 
 def main():
@@ -185,16 +324,11 @@ def main():
     with open(args.in_filename, "r") as file:
         ast = parse(file)
 
-    targets, deps, deps_map = parse_targets(ast)
+    targets, deps, deps_map = parse_targets(ast, makefile_lines)
 
-    errors: List[str] = []
+    errors: list[LintError] = []
     if not validate(makefile_lines, targets, deps, deps_map, errors=errors):
-        counts = collections.Counter(msg.split(':')[0] for msg in errors)
-        summary_parts = []
-        for name, count in counts.items():
-            label = name.strip().lower()
-            summary_parts.append(f"{count} {label}{'' if label.endswith('s') else 's'}")
-        summary = '; '.join(summary_parts)
+        summary = summarize_errors(errors)
         print(f"Makefile validation failed: {summary}", file=sys.stderr)
         return 1
 
