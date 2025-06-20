@@ -195,14 +195,24 @@ def get_dependencies_influences(ast: List[Tuple[Tokens, Dict[str, Any]]]):
             influences[k]
         order_only.update(order_deps)
 
-    def recurse_indirect_influences(original_target, recurse_target):
-        indirect_influences[original_target].update(influences[recurse_target])
-        for t in influences[recurse_target]:
-            recurse_indirect_influences(original_target, t)
+    # Cache previously calculated descendants to avoid quadratic behaviour on
+    # large graphs. ``descendants(target)`` returns a set of all nodes reachable
+    # from ``target`` including direct children.
+    cached_descendants = {}
 
-    for original_target, targets in influences.items():
-        for t in targets:
-            recurse_indirect_influences(original_target, t)
+    def descendants(target):
+        if target in cached_descendants:
+            return cached_descendants[target]
+        result = set(influences[target])
+        for child in influences[target]:
+            result.update(descendants(child))
+        cached_descendants[target] = result
+        return result
+
+    for original_target in influences:
+        indirect_influences[original_target] = (
+            descendants(original_target) - influences[original_target]
+        )
 
     return dependencies, influences, order_only, indirect_influences
     
