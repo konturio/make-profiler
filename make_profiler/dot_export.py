@@ -73,6 +73,31 @@ def critical_path(influences, dependencies, inputs, timing):
     return cp, timing_tags
 
 
+def current_run_critical_path(influences, dependencies, timing):
+    """Return the critical path limited to targets executed in the current run."""
+    current = {t for t, perf in timing.items() if perf.get('current')}
+    if not current:
+        return set()
+
+    inf = {k: {d for d in v if d in current} for k, v in influences.items() if k in current}
+    deps = {}
+    for k, (deps_list, order_list) in dependencies.items():
+        if k not in current:
+            continue
+        deps[k] = [
+            [d for d in deps_list if d in current],
+            [d for d in order_list if d in current],
+        ]
+
+    inputs = set(inf.keys())
+    for v in inf.values():
+        for t in v:
+            inputs.discard(t)
+
+    cp, _ = critical_path(inf, deps, inputs, timing)
+    return cp
+
+
 def classify_target(name, influences, dependencies, inputs, order_only):
     group = ''
     if name not in dependencies:
@@ -100,12 +125,16 @@ def dot_node(graph, name, performance, docstring, cp, *, invisible=False):
     }
     if name in performance:
         target_performance = performance[name]
-        if target_performance['done']:
+        # Mark targets built in the current run with a dedicated color.
+        if target_performance.get('failed'):
+            node['fillcolor'] = '.05 .3 1.0'
+        elif target_performance.get('current'):
+            node['fillcolor'] = '#0969DA'
+            node['fontcolor'] = '#fff'
+        elif target_performance.get('done'):
             node['fillcolor'] = '.7 .3 1.0'
             if target_performance['isdir']:
                 node['fillcolor'] = '.2 .3 1.0'
-        if target_performance['failed']:
-            node['fillcolor'] = '.05 .3 1.0'
         timing_sec = target_performance.get('timing_sec', 0)
         timing = str(datetime.timedelta(seconds=int(timing_sec)))
         if 'log' in target_performance:
@@ -143,6 +172,7 @@ def export_dot(f, influences, dependencies, order_only, performance, indirect_in
             inputs.discard(t)
 
     cp, timing_tags = critical_path(influences, dependencies, inputs, performance)
+    cp_last = current_run_critical_path(influences, dependencies, performance)
 
     # cluster labels
     labels = {
@@ -182,8 +212,10 @@ def export_dot(f, influences, dependencies, order_only, performance, indirect_in
         for t in sorted(v):
             if t in indirect_influences[k]:
                 dot.edge(k, t, color="#00000033", weight="0", style="dashed")
+            elif k in cp_last and t in cp_last:
+                dot.edge(k, t, color="#800080", weight="10", penwidth="3", headclip="true")
             elif k in cp and t in cp:
-                dot.edge(k, t, color="#cc0000", weight="10", penwidth="3", headclip="true")
+                dot.edge(k, t, color="#cc0000", weight="20", penwidth="6", headclip="true")
             else:
                 dot.edge(k, t)
 
