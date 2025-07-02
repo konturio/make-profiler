@@ -215,7 +215,7 @@ def export_dot(f, influences, dependencies, order_only, performance, indirect_in
             elif k in cp_last and t in cp_last:
                 dot.edge(k, t, color="#800080", weight="10", penwidth="3", headclip="true")
             elif k in cp and t in cp:
-                dot.edge(k, t, color="#cc0000", weight="10", penwidth="3", headclip="true")
+                dot.edge(k, t, color="#cc0000", weight="20", penwidth="6", headclip="true")
             else:
                 dot.edge(k, t)
 
