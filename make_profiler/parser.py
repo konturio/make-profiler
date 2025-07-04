@@ -163,7 +163,7 @@ def parse(fd: TextIO, is_check_loop: bool = True, loop_check_depth: int = 20) ->
                     'grouped': sep == '&:',
                     'deps': [deps, order_deps],
                     'docs': docs,
-                    'body': body,
+                    'body': body
                 }
             )
         )

@@ -27,6 +27,7 @@ The `critical path` is the longest sequence of dependent targets determined by `
 Targets that nobody depends on are classified as results. Targets that have no dependencies and no dependents are classified as tools (for example, `clean`). These groupings control the visual clusters in the SVG output.
 
 ## Grouped targets
+
 Using `&:` in a rule declares that several targets are produced by the same
 command block. For example:
 
