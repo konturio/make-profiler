@@ -26,3 +26,18 @@ The `critical path` is the longest sequence of dependent targets determined by `
 ## Tools and results
 Targets that nobody depends on are classified as results. Targets that have no dependencies and no dependents are classified as tools (for example, `clean`). These groupings control the visual clusters in the SVG output.
 
+## Grouped targets
+
+Using `&:` in a rule declares that several targets are produced by the same
+command block. For example:
+
+```make
+foo bar &: deps
+@echo building both
+```
+
+The profiler merges `foo` and `bar` into one node so the recipe appears only
+once in the call graph. When multiple targets are listed with a plain `:`, Make
+may run the recipe more than once in parallel; the linter reports this pattern
+and suggests using `&:` instead.
+
