@@ -1,5 +1,4 @@
 import io
-import pytest
 from make_profiler import parser, lint_makefile
 
 
@@ -134,5 +133,26 @@ def test_summary_counts_similar_errors() -> None:
     summary = lint_makefile.summarize_errors(errors)
     assert "space instead of tab: 3" in summary
     assert "missing rule: 1" in summary
+
+
+def test_multiple_targets_with_colon_warns() -> None:
+    mk = (
+        "foo bar: dep\n"
+        "\t@echo hi\n"
+    )
+    valid, errors = run_validation(mk)
+    assert not valid
+    assert any(e.error_type == "multiple targets with colon" for e in errors)
+
+
+def test_multiple_targets_grouped_is_ok() -> None:
+    mk = (
+        "foo bar &: dep ## [FINAL] doc\n"
+        "\t@echo hi\n"
+        "dep: ## used\n"
+        "\t@echo dep\n"
+    )
+    valid, errors = run_validation(mk)
+    assert valid, errors
 
 
