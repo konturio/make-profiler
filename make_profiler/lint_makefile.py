@@ -119,7 +119,7 @@ def parse_targets(
                     line_number=line_number,
                     line_text=line_text,
                     grouped=data.get("grouped", False),
-                )
+                ),
             )
 
         for dep_arr in data["deps"]:

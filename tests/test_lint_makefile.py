@@ -31,8 +31,6 @@ def test_spaces_after_multiline_continuation() -> None:
     )
     valid, errors = run_validation(mk)
     assert valid, errors
-
-
 def test_trailing_spaces_after_continuation() -> None:
     mk = "all: foo \\  \n\t@echo foo\n"
     valid, errors = run_validation(mk)
@@ -136,6 +134,7 @@ def test_summary_counts_similar_errors() -> None:
 
 
 def test_multiple_targets_with_colon_warns() -> None:
+    """Warn when multiple targets share a rule without grouping."""
     mk = (
         "foo bar: dep\n"
         "\t@echo hi\n"
@@ -146,6 +145,7 @@ def test_multiple_targets_with_colon_warns() -> None:
 
 
 def test_multiple_targets_grouped_is_ok() -> None:
+    """Grouped targets using '&:' should pass validation."""
     mk = (
         "foo bar &: dep ## [FINAL] doc\n"
         "\t@echo hi\n"
@@ -154,5 +154,3 @@ def test_multiple_targets_grouped_is_ok() -> None:
     )
     valid, errors = run_validation(mk)
     assert valid, errors
-
-

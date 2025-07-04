@@ -164,7 +164,7 @@ def parse(fd: TextIO, is_check_loop: bool = True, loop_check_depth: int = 20) ->
                     'deps': [deps, order_deps],
                     'docs': docs,
                     'body': body,
-                },
+                }
             )
         )
 
@@ -203,8 +203,8 @@ def get_dependencies_influences(ast: List[Tuple[Tokens, Dict[str, Any]]]):
             continue
         targets = item.get('all_targets', [item['target']])
         canonical = targets[0]
-        for alias in targets[1:]:
-            alias_map[alias] = canonical
+        for alias_name in targets[1:]:
+            alias_map[alias_name] = canonical
 
     def alias(name: str) -> str:
         return alias_map.get(name, name)

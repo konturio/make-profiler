@@ -80,7 +80,7 @@ def generate_makefile(ast, fd, db_filename):
         elif item_type == Tokens.target:
             targets = item.get('all_targets', [item['target']])
             sep = '&:' if item.get('grouped') else ':'
-            fd.write('{}{}'.format(' '.join(targets), sep))
+            fd.write(f"{' '.join(targets)}{sep}")
             deps, order_deps = item['deps']
             if deps:
                 fd.write(' {}'.format(' '.join(deps)))

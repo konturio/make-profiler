@@ -83,7 +83,8 @@ def test_current_run_critical_path_colored():
     assert 'color="#800080"' in data
 
 
-def test_grouped_targets_render_once():
+def test_grouped_targets_render_once() -> None:
+    """Grouped targets produce one node in the DOT output."""
     mk = (
         "a b &:\n"
         "\t@true\n"
