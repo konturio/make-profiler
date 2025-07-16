@@ -1,5 +1,4 @@
 import io
-import pytest
 from make_profiler import parser, lint_makefile
 
 
@@ -32,8 +31,6 @@ def test_spaces_after_multiline_continuation() -> None:
     )
     valid, errors = run_validation(mk)
     assert valid, errors
-
-
 def test_trailing_spaces_after_continuation() -> None:
     mk = "all: foo \\  \n\t@echo foo\n"
     valid, errors = run_validation(mk)
@@ -136,3 +133,24 @@ def test_summary_counts_similar_errors() -> None:
     assert "missing rule: 1" in summary
 
 
+def test_multiple_targets_with_colon_warns() -> None:
+    """Warn when multiple targets share a rule without grouping."""
+    mk = (
+        "foo bar: dep\n"
+        "\t@echo hi\n"
+    )
+    valid, errors = run_validation(mk)
+    assert not valid
+    assert any(e.error_type == "multiple targets with colon" for e in errors)
+
+
+def test_multiple_targets_grouped_is_ok() -> None:
+    """Grouped targets using '&:' should pass validation."""
+    mk = (
+        "foo bar &: dep ## [FINAL] doc\n"
+        "\t@echo hi\n"
+        "dep: ## used\n"
+        "\t@echo dep\n"
+    )
+    valid, errors = run_validation(mk)
+    assert valid, errors

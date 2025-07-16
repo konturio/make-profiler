@@ -81,3 +81,24 @@ def test_current_run_critical_path_colored():
     export_dot(f, inf, deps, order, perf, ind, docs)
     data = f.getvalue()
     assert 'color="#800080"' in data
+
+
+def test_grouped_targets_render_once() -> None:
+    """Grouped targets produce one node in the DOT output."""
+    mk = (
+        "a b &:\n"
+        "\t@true\n"
+        "c: a\n"
+        "\t@true\n"
+        "d: b\n"
+        "\t@true\n"
+    )
+    ast = parser.parse(io.StringIO(mk))
+    deps, inf, order, indirect = parser.get_dependencies_influences(ast)
+    docs = {t[1]['target']: t[1]['docs'] for t in ast if t[0] == parser.Tokens.target}
+    f = io.StringIO()
+    export_dot(f, inf, deps, order, {}, indirect, docs)
+    data = f.getvalue()
+    assert 'a -> c' in data
+    assert 'a -> d' in data
+    assert 'b ->' not in data  # b is merged with a

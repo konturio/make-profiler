@@ -127,24 +127,45 @@ def parse(fd: TextIO, is_check_loop: bool = True, loop_check_depth: int = 20) ->
     it = peekable(tokenizer(insert_included_files(fd, is_check_loop, loop_check_depth)))
 
     def parse_target(token: Tuple[Tokens, str]):
+        """Parse a Makefile rule and store it in the AST.
+
+        Supports both traditional ``target:`` syntax and ``&:`` grouped
+        targets introduced in GNU make 4.3. When ``&:`` is used all targets
+        in the list are produced by a single recipe execution.
+        """
         line = token[1]
-        target, deps, order_deps, docstring = re.match(
-            r'(.+?): \s? ([^|#]+)? \s? [|]? \s? ([^##]+)? \s?  \s? ([#][#].+)?',
-            line,
-            re.X
-        ).groups()
+
+        sep = '&:' if '&:' in line else ':'
+        target_part, rest = line.split(sep, 1)
+        targets = target_part.strip().split()
+
+        docs = ''
+        if '##' in rest:
+            rest, docs = rest.split('##', 1)
+            docs = docs.strip()
+
+        rest = rest.strip()
+        if '|' in rest:
+            deps_part, order_part = rest.split('|', 1)
+            order_deps = sorted(order_part.strip().split()) if order_part.strip() else []
+        else:
+            deps_part = rest
+            order_deps = []
+        deps = sorted(deps_part.strip().split()) if deps_part.strip() else []
+
         body = parse_body()
-        ast.append((
-            token[0],
-            {
-                'target': target.strip(),
-                'deps': [
-                    sorted(deps.strip().split()) if deps else [],
-                    sorted(order_deps.strip().split()) if order_deps else []
-                ],
-                'docs': docstring.strip().strip('#').strip() if docstring else '',
-                'body': body
-            })
+        ast.append(
+            (
+                token[0],
+                {
+                    'target': targets[0],
+                    'all_targets': targets,
+                    'grouped': sep == '&:',
+                    'deps': [deps, order_deps],
+                    'docs': docs,
+                    'body': body
+                }
+            )
         )
 
     def next_belongs_to_target() -> bool:
@@ -176,11 +197,25 @@ def get_dependencies_influences(ast: List[Tuple[Tokens, Dict[str, Any]]]):
     order_only = set()
     indirect_influences = collections.defaultdict(set)
 
+    alias_map = {}
     for item_t, item in ast:
         if item_t != Tokens.target:
             continue
-        target = item['target']
+        targets = item.get('all_targets', [item['target']])
+        canonical = targets[0]
+        for alias_name in targets[1:]:
+            alias_map[alias_name] = canonical
+
+    def alias(name: str) -> str:
+        return alias_map.get(name, name)
+
+    for item_t, item in ast:
+        if item_t != Tokens.target:
+            continue
+        target = alias(item['target'])
         deps, order_deps = item['deps']
+        deps = [alias(d) for d in deps]
+        order_deps = [alias(d) for d in order_deps]
 
         if target in ('.PHONY',):
             continue

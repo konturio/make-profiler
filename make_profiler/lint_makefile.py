@@ -37,6 +37,7 @@ class TargetData:
     doc: str
     line_number: int | None = None
     line_text: str | None = None
+    grouped: bool = False
 
 
 def _create_error(
@@ -59,7 +60,7 @@ def _compute_target_lines(lines: list[str]) -> dict[str, tuple[int, str]]:
     mapping: dict[str, tuple[int, str]] = {}
     i = 0
     n = len(lines)
-    target_re = re.compile(r"(?P<target>[^:]+):")
+    target_re = re.compile(r"(?P<target>.+?)(?:&:|:)")
 
     while i < n:
         line = lines[i]
@@ -108,21 +109,24 @@ def parse_targets(
         if token_type != "target":
             continue
 
-        name = data["target"]
-        line_number, line_text = line_map.get(name, (None, None))
-        target_data.append(
-            TargetData(
-                name=name,
-                doc=data["docs"],
-                line_number=line_number,
-                line_text=line_text,
+        names = data.get("all_targets", [data["target"]])
+        for name in names:
+            line_number, line_text = line_map.get(name, (None, None))
+            target_data.append(
+                TargetData(
+                    name=name,
+                    doc=data["docs"],
+                    line_number=line_number,
+                    line_text=line_text,
+                    grouped=data.get("grouped", False),
+                ),
             )
-        )
 
         for dep_arr in data["deps"]:
             for item in dep_arr:
                 deps_targets.add(item)
-                deps_map[item].add(name)
+                for name in names:
+                    deps_map[item].add(name)
 
     return target_data, deps_targets, deps_map
 
@@ -261,10 +265,47 @@ def validate_spaces(lines: list[str], *, errors: list[LintError] | None = None) 
     return is_valid
 
 
+def validate_multiple_targets_colon(
+    targets: list[TargetData],
+    _deps: set[str],
+    _dep_map: dict[str, set[str]],
+    *,
+    errors: list[LintError] | None = None,
+) -> bool:
+    """Warn when multiple targets share a rule without '&:' grouping."""
+    is_valid = True
+
+    for t in targets:
+        if t.grouped or t.line_text is None:
+            continue
+        m = re.match(r"(?P<target>.+?)(?:&:|:)", t.line_text)
+        if m:
+            names = m.group("target").split()
+            if len(names) > 1:
+                msg = (
+                    f"Multiple targets defined with ':' may run several times in parallel: "
+                    f"{m.group('target')}. Use '&:' to group them"
+                )
+                print(msg, file=sys.stderr)
+                if errors is not None:
+                    errors.append(
+                        _create_error(
+                            "multiple targets with colon",
+                            msg,
+                            line_number=t.line_number,
+                            line_text=t.line_text,
+                        ),
+                    )
+                is_valid = False
+
+    return is_valid
+
+
 TARGET_VALIDATORS: list[Callable[..., bool]] = [
     validate_orphan_targets,
     validate_target_comments,
     validate_missing_rules,
+    validate_multiple_targets_colon,
 ]
 # The list holds validators with varying signatures, so use a generic Callable.
 TEXT_VALIDATORS: list[Callable[..., bool]] = [validate_spaces]
