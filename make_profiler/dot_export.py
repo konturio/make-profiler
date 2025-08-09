@@ -174,6 +174,24 @@ def export_dot(f, influences, dependencies, order_only, performance, indirect_in
     cp, timing_tags = critical_path(influences, dependencies, inputs, performance)
     cp_last = current_run_critical_path(influences, dependencies, performance)
 
+    # filter graph for targets executed in the latest run
+    current_targets = {t for t, p in performance.items() if p.get('current')}
+    cur_inf = {
+        k: {d for d in v if d in current_targets}
+        for k, v in influences.items()
+        if k in current_targets
+    }
+    cur_deps = {}
+    for k, v in dependencies.items():
+        if k in current_targets:
+            cur_deps[k] = [[d for d in deps if d in current_targets] for deps in v]
+    cur_inputs = set(cur_inf.keys())
+    for v in cur_inf.values():
+        for d in v:
+            cur_inputs.discard(d)
+
+    cp_current, _ = critical_path(cur_inf, cur_deps, cur_inputs, performance)
+
     # cluster labels
     labels = {
         'cluster_inputs': 'Input',
@@ -218,6 +236,8 @@ def export_dot(f, influences, dependencies, order_only, performance, indirect_in
                 dot.edge(k, t, color="#cc0000", weight="20", penwidth="6", headclip="true")
             else:
                 dot.edge(k, t)
+            if k in cp_current and t in cp_current:
+                dot.edge(k, t, color="#6600cc", weight="10", penwidth="3", constraint="false")
 
     dot.edge('cluster_inputs_DUMMY', 'cluster_tools_DUMMY', style='invis')
     dot.edge('cluster_tools_DUMMY', 'cluster_result_DUMMY', style='invis')
