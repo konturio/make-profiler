@@ -45,6 +45,33 @@ def test_critical_path_handles_final_targets():
     assert 'subgraph cluster_tools' in data
 
 
+def test_last_run_critical_path_highlighted():
+    inf = {'b': {'a'}, 'a': set()}
+    deps = {'a': [['b'], []], 'b': [[], []]}
+    perf = {
+        'a': {
+            'start_current': 0,
+            'finish_current': 1,
+            'current': True,
+            'done': True,
+            'isdir': False,
+            'failed': False,
+        },
+        'b': {
+            'start_current': 0,
+            'finish_current': 2,
+            'current': True,
+            'done': True,
+            'isdir': False,
+            'failed': False,
+        },
+    }
+    f = io.StringIO()
+    export_dot(f, inf, deps, set(), perf, {'a': set(), 'b': set()}, {'a': 'A', 'b': 'B'})
+    data = f.getvalue()
+    assert 'color="#6600cc"' in data
+
+
 def test_example_makefile_from_readme():
     with open('test/example.mk', encoding='utf-8') as fh:
         ast = parser.parse(fh)
